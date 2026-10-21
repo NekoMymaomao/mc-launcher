@@ -4,6 +4,7 @@
 #include "core/java.hpp"
 #include "core/modloader.hpp"
 #include "core/utils.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 

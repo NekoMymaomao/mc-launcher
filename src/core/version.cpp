@@ -1,5 +1,6 @@
 #include "core/version.hpp"
 #include "core/http.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <algorithm>

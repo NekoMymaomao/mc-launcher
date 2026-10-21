@@ -1,6 +1,7 @@
 #include "core/auth.hpp"
 #include "core/http.hpp"
 #include "core/utils.hpp"
+#include <nlohmann/json.hpp>
 #include <iomanip>
 #include <regex>
 

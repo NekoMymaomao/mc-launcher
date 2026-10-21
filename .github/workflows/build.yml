@@ -33,13 +33,14 @@ jobs:
           cmake \
           build-essential \
           libcurl4-openssl-dev \
-          zlib1g-dev
+          zlib1g-dev \
+          nlohmann-json3-dev
 
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
         vcpkg integrate install
-        vcpkg install curl:x64-windows zlib:x64-windows
+        vcpkg install curl:x64-windows zlib:x64-windows nlohmann-json:x64-windows
 
     # ============================================================
     # CMake 配置
