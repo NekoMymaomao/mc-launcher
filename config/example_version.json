@@ -1,0 +1,78 @@
+# MC Launcher 配置示例
+
+{
+  "id": "1.20.1",
+  "mainClass": "net.minecraft.client.main.Main",
+  "assetIndex": {
+    "id": "1.20",
+    "url": "https://piston-data.mojang.com/v1/objects/1.20.json"
+  },
+  "assets": "1.20",
+  "libraries": [
+    {
+      "name": "com.mojang:patching:1.2.1",
+      "downloads": {
+        "artifact": {
+          "url": "https://piston-data.mojang.com/v1/objects/abc123.jar",
+          "sha1": "abc123",
+          "size": 12345
+        }
+      }
+    },
+    {
+      "name": "net.minecraftforge:forge:1.20.1-47.2.0",
+      "downloads": {
+        "artifact": {
+          "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0.jar",
+          "classifier": "universal"
+        },
+        "natives": {
+          "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-natives-linux.jar",
+          "classifier": "natives-linux"
+        }
+      }
+    }
+  ],
+  "rules": [
+    {
+      "action": "allow",
+      "os": {
+        "name": "windows"
+      }
+    },
+    {
+      "action": "allow",
+      "os": {
+        "name": "linux"
+      }
+    },
+    {
+      "action": "deny",
+      "os": {
+        "name": "osx"
+      }
+    }
+  ],
+  "arguments": {
+    "game": [
+      "--username",
+      "${auth_player_name}",
+      "--version",
+      "${version_name}",
+      "--gameDir",
+      "${game_directory}",
+      "--assetsDir",
+      "${assets_root}",
+      "--assetIndex",
+      "${asset_index}",
+      "--uuid",
+      "${auth_uuid}",
+      "--accessToken",
+      "${auth_access_token}",
+      "--userType",
+      "${user_type}",
+      "--versionType",
+      "${version_type}"
+    ]
+  }
+}
