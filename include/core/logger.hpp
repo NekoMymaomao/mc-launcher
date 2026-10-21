@@ -1,15 +1,16 @@
 #pragma once
 #include <string>
-#include <sstream>
-#include <iostream>
-#include <chrono>
-#include <iomanip>
-#include <ctime>
+#include <functional>
+#include <atomic>
+#include <curl/curl.h>
+#include "utils.hpp"
 
 namespace mc {
 
+// 日志级别
 enum class LogLevel { DEBUG, INFO, WARN, ERROR };
 
+// 日志类
 class Logger {
 public:
     static Logger& instance() {
@@ -40,7 +41,7 @@ public:
                  << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S")
                  << "." << std::setfill('0') << std::setw(3) << ms.count() 
                  << "] [" << levelStr(level) << "] "
-                 << file << ":" << line << " - ";
+                 << utils::PathUtils::getFileName(file) << ":" << line << " - ";
         
         (output_ << ... << std::forward<Args>(args));
         *output_ << "\n";

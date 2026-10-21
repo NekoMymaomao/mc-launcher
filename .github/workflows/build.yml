@@ -10,20 +10,20 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CACHE_NAME: mc-launcher-deps
+  CACHE_KEY: mc-launcher-deps
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-22.04, windows-latest]
     
     steps:
     - uses: actions/checkout@v4
 
     # ============================================================
-    # Linux: 自动安装依赖
+    # Linux: 安装依赖
     # ============================================================
     - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
@@ -33,49 +33,27 @@ jobs:
           cmake \
           build-essential \
           libcurl4-openssl-dev \
-          nlohmann-json3-dev
+          libssl-dev \
+          zlib1g-dev
 
     # ============================================================
-    # Windows: 提示用户手动安装依赖
+    # Windows: 环境准备
     # ============================================================
-    - name: Setup Windows dependencies
+    - name: Setup Windows
       if: runner.os == 'Windows'
-      run: |
-        echo "=========================================="
-        echo "Windows Build Dependencies"
-        echo "=========================================="
-        echo ""
-        echo "For local builds, install these dependencies:"
-        echo ""
-        echo "1. CMake: https://cmake.org/download/"
-        echo "2. Visual Studio 2019+ with C++ tools"
-        echo "3. vcpkg (recommended):"
-        echo "   git clone https://github.com/microsoft/vcpkg"
-        echo "   .\vcpkg\bootstrap-vcpkg.bat"
-        echo "   .\vcpkg\vcpkg install curl boost filesystem"
-        echo ""
-        echo "=========================================="
-        
-        # 检查是否已安装
-        if (cmd /c "cmake --version" 2>$null) {
-            cmake --version
-        } else {
-            Write-Host "WARNING: cmake not found"
-        }
+      uses: lukka/run-cmake@v3
+      with:
+        cmakeCommandArgs: -DCMAKE_BUILD_TYPE=Release
 
     # ============================================================
-    # CMake 配置
+    # 构建
     # ============================================================
     - name: Configure CMake
       run: |
         cmake -B ${{ github.workspace }}/build \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
           -DBUILD_TESTS=ON
 
-    # ============================================================
-    # 构建
-    # ============================================================
     - name: Build
       run: |
         cmake --build ${{ github.workspace }}/build \
@@ -90,44 +68,49 @@ jobs:
       run: ctest --output-on-failure
 
     # ============================================================
-    # 打包产物
+    # 打包
     # ============================================================
     - name: Package
       run: |
         cmake --install ${{ github.workspace }}/build \
-          --config ${{ env.BUILD_TYPE }}
+          --config ${{ env.BUILD_TYPE }} \
+          --prefix ${{ github.workspace }}/install
         
-        # 创建发布包
-        $package_name = if ($env:RUNNER_OS -eq 'Windows') { 'mc-launcher-windows' } else { 'mc-launcher-linux' }
+        # 创建启动器目录结构
+        mkdir -p ${{ github.workspace }}/install/launcher/{versions,libraries,assets,sessions,backups,logs}
         
-        if ($env:RUNNER_OS -eq 'Windows') {
-            Compress-Archive -Path "${{ github.workspace }}/install/*" -DestinationPath "${{ github.workspace }}/$package_name.zip"
-        } else {
+        # 复制配置文件
+        cp -r config/launcher_template/* ${{ github.workspace }}/install/launcher/ 2>/dev/null || true
+        
+        # 打包
+        if [ "${{ runner.os }}" == "Windows" ]; then
             cd ${{ github.workspace }}/install
-            tar czf ${{ github.workspace }}/$package_name.tar.gz .
-        }
-        
-        Write-Host "Package created: ${{ github.workspace }}/$package_name.*"
+            7z a -tzip mc-launcher-windows.zip .
+        else
+            cd ${{ github.workspace }}/install
+            tar czf mc-launcher-linux.tar.gz .
+        fi
 
     # ============================================================
-    # 上传产物
+    # 上传 artifacts
     # ============================================================
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: mc-launcher-${{ runner.os }}
         path: ${{ github.workspace }}/mc-launcher-${{ runner.os }}.*
+        retention-days: 7
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
     
     steps:
     - uses: actions/download-artifact@v4
       with:
         path: artifacts
-
+        
     - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:

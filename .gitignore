@@ -28,6 +28,8 @@ Thumbs.db
 
 # Vendor (本地依赖)
 vendor/
+!vendor/miniz/
+!vendor/nlohmann/
 
 # CMake
 CMakeCache.txt
@@ -38,3 +40,8 @@ compile_commands.json
 
 # Test binaries
 tests/test_*
+
+# Launchers
+launcher/
+.launcher/
+.mc-launcher/

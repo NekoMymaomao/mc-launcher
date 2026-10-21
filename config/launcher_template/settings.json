@@ -1,0 +1,17 @@
+# MC Launcher 配置文件模板
+# 这些文件会在启动时自动生成
+
+{
+  "launcher_version": "1.0.0",
+  "default_memory": 4096,
+  "min_memory": 1024,
+  "auto_java_install": true,
+  "native_assets": false,
+  "jvm_args": [
+    "-XX:+UseG1GC",
+    "-XX:InitiatingHeapOccupancyPercent=30",
+    "-XX:+ParallelRefProcEnabled",
+    "-XX:G1ReservePercent=15"
+  ],
+  "game_args": []
+}
