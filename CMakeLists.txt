@@ -19,75 +19,51 @@ elseif(APPLE)
 endif()
 
 # ============================================================
-# 依赖配置
+# 依赖配置 - 优先使用系统库
 # ============================================================
 
-# nlohmann_json: header-only
+# nlohmann_json
 find_package(nlohmann_json QUIET)
 if(NOT nlohmann_json_FOUND)
-    message(STATUS "nlohmann_json not found, downloading from GitHub...")
-    include(FetchContent)
-    FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.11.3
-    )
-    FetchContent_MakeAvailable(nlohmann_json)
+    find_path(NLOHMANN_JSON_INCLUDE_DIR NAMES nlohmann/json.hpp)
+    if(NOT NLOHMANN_JSON_INCLUDE_DIR)
+        message(FATAL_ERROR "nlohmann_json not found. Install: apt-get install nlohmann-json3-dev")
+    endif()
+    message(STATUS "Found nlohmann_json at: ${NLOHMANN_JSON_INCLUDE_DIR}")
 endif()
 
 # curl
-find_library(CURL_LIBRARY NAMES curl libcurl)
-find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
-if(CURL_LIBRARY AND CURL_INCLUDE_DIR)
-    add_library(CURL::libcurl UNKNOWN IMPORTED)
-    set_target_properties(CURL::libcurl PROPERTIES
-        IMPORTED_LOCATION "${CURL_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIR}"
-    )
-    message(STATUS "Using system libcurl")
-else()
-    message(STATUS "libcurl not found, downloading from GitHub...")
-    include(FetchContent)
-    FetchContent_Declare(
-        curl
-        GIT_REPOSITORY https://github.com/curl/curl.git
-        GIT_TAG curl-8_10_1
-    )
-    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-    set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
-    set(CURL_STATICLIB ON CACHE BOOL "" FORCE)
-    set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
-    set(ENABLE_IPV6 ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(curl)
-endif()
-
-# miniz (zip handling)
-find_library(MINIZ_LIBRARY NAMES miniz)
-find_path(MINIZ_INCLUDE_DIR NAMES miniz.h)
-if(MINIZ_LIBRARY AND MINIZ_INCLUDE_DIR)
-    message(STATUS "Using system miniz")
-else()
-    message(STATUS "miniz not found, downloading from GitHub...")
-    include(FetchContent)
-    FetchContent_Declare(
-        miniz
-        GIT_REPOSITORY https://github.com/richgel999/miniz.git
-        GIT_TAG 3.0.2
-    )
-    FetchContent_MakeAvailable(miniz)
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    find_library(CURL_LIBRARY NAMES curl libcurl)
+    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
+    if(CURL_LIBRARY AND CURL_INCLUDE_DIR)
+        add_library(CURL::libcurl UNKNOWN IMPORTED)
+        set_target_properties(CURL::libcurl PROPERTIES
+            IMPORTED_LOCATION "${CURL_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIR}"
+        )
+        message(STATUS "Using system libcurl")
+    else()
+        message(FATAL_ERROR "curl not found. Install: apt-get install libcurl4-openssl-dev")
+    endif()
 endif()
 
 # zlib
 find_package(ZLIB QUIET)
 if(NOT ZLIB_FOUND)
-    message(STATUS "zlib not found, downloading...")
-    include(FetchContent)
-    FetchContent_Declare(
-        zlib
-        GIT_REPOSITORY https://github.com/madler/zlib.git
-        GIT_TAG v1.3.1
-    )
-    FetchContent_MakeAvailable(zlib)
+    find_library(ZLIB_LIBRARY NAMES z)
+    find_path(ZLIB_INCLUDE_DIR NAMES zlib.h)
+    if(ZLIB_LIBRARY AND ZLIB_INCLUDE_DIR)
+        add_library(ZLIB::zlib UNKNOWN IMPORTED)
+        set_target_properties(ZLIB::zlib PROPERTIES
+            IMPORTED_LOCATION "${ZLIB_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIR}"
+        )
+        message(STATUS "Using system zlib")
+    else()
+        message(FATAL_ERROR "zlib not found. Install: apt-get install zlib1g-dev")
+    endif()
 endif()
 
 # ============================================================
@@ -99,9 +75,9 @@ add_executable(mc_launcher ${SOURCES})
 
 target_include_directories(mc_launcher PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${nlohmann_json_SOURCE_DIR}
+    ${NLOHMANN_JSON_INCLUDE_DIR}
     ${CURL_INCLUDE_DIR}
-    ${MINIZ_INCLUDE_DIR}
+    ${ZLIB_INCLUDE_DIR}
 )
 
 # 链接库
@@ -126,8 +102,6 @@ endif()
 # 安装配置
 # ============================================================
 install(TARGETS mc_launcher RUNTIME DESTINATION bin)
-
-# 安装启动器目录模板
 install(DIRECTORY config/launcher_template/ DESTINATION share/mc_launcher)
 
 # ============================================================
