@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <functional>
+#include <random>
+#include <chrono>
 
 #ifdef MC_WINDOWS
     #include <windows.h>
@@ -207,6 +209,14 @@ public:
         return a + SEP + b;
     }
 
+    static std::string join(const std::string& a, const std::string& b, const std::string& c) {
+        return join(join(a, b), c);
+    }
+
+    static std::string join(const std::string& a, const std::string& b, const std::string& c, const std::string& d) {
+        return join(join(join(a, b), c), d);
+    }
+
     static std::string getHomeDir() {
 #ifdef MC_WINDOWS
         const char* h = getenv("USERPROFILE");
@@ -313,11 +323,7 @@ private:
 class ProcessUtils {
 public:
     static int run(const std::string& cmd) {
-#ifdef MC_WINDOWS
         return system(cmd.c_str());
-#else
-        return system(cmd.c_str());
-#endif
     }
 
     static std::string getVersion(const std::string& javaPath) {
@@ -410,7 +416,7 @@ public:
                 case ARRAY_TYPE:
                     os << "[\n";
                     for (size_t i = 0; i < arr_val.size(); i++) {
-                        os << pad1 << arr_val[i].dumpInternal(indent, depth + 1);
+                        os << pad1 << arr_val[i].dumpInternal(os, indent, depth + 1);
                         if (i < arr_val.size() - 1) os << ",";
                         os << "\n";
                     }
@@ -420,7 +426,7 @@ public:
                     os << "{\n";
                     size_t i = 0;
                     for (auto& [k, v] : obj_val) {
-                        os << pad1 << "\"" << escapeString(k) << "\": " << v.dumpInternal(indent, depth + 1);
+                        os << pad1 << "\"" << escapeString(k) << "\": " << v.dumpInternal(os, indent, depth + 1);
                         if (++i < obj_val.size()) os << ",";
                         os << "\n";
                     }

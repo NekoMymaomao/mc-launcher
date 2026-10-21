@@ -15,12 +15,14 @@ std::string JavaManager::getJavaHome() const {
 std::string JavaManager::getJavaFromPath() const {
 #ifdef MC_WINDOWS
     std::string out;
-    utils::ProcessUtils::run("where java", [&](const std::string& line){ out = line; });
+    FILE* f = popen("where java", "r");
+    if (f) { char buf[4096]; while (fgets(buf, sizeof(buf), f)) out += buf; pclose(f); }
     size_t p = out.find("\\bin\\java.exe");
     return (p != std::string::npos) ? out.substr(0, p + 4) : "";
 #else
     std::string out;
-    utils::ProcessUtils::run("which java", [&](const std::string& line){ out = line; });
+    FILE* f = popen("which java", "r");
+    if (f) { char buf[4096]; while (fgets(buf, sizeof(buf), f)) out += buf; pclose(f); }
     return utils::StringUtils::trim(out);
 #endif
 }
