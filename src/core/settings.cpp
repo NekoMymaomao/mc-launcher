@@ -1,5 +1,6 @@
 #include "core/settings.hpp"
 #include "core/utils.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 
 namespace mc {

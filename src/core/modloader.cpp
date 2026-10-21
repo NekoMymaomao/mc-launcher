@@ -1,6 +1,7 @@
 #include "core/modloader.hpp"
 #include "core/http.hpp"
 #include "core/utils.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 
 namespace mc {

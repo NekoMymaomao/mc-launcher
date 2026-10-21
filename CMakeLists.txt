@@ -19,30 +19,14 @@ elseif(APPLE)
 endif()
 
 # ============================================================
-# 依赖配置 - 使用 FetchContent
+# 依赖配置
 # ============================================================
-include(FetchContent)
 
-# nlohmann_json (header-only)
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(nlohmann_json)
+# nlohmann_json
+find_package(nlohmann_json REQUIRED)
 
-# curl (静态链接)
-FetchContent_Declare(
-    curl
-    GIT_REPOSITORY https://github.com/curl/curl.git
-    GIT_TAG curl-8_10_1
-)
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
-set(CURL_STATICLIB ON CACHE BOOL "" FORCE)
-set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
-set(USE_OPENSSL ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(curl)
+# curl
+find_package(CURL REQUIRED)
 
 # zlib
 find_package(ZLIB REQUIRED)
@@ -56,11 +40,11 @@ add_executable(mc_launcher ${SOURCES})
 
 target_include_directories(mc_launcher PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${nlohmann_json_SOURCE_DIR}
 )
 
 # 链接库
 target_link_libraries(mc_launcher PRIVATE
+    nlohmann_json::nlohmann_json
     CURL::libcurl
     ZLIB::zlib
     ${CMAKE_DL_LIBS}
