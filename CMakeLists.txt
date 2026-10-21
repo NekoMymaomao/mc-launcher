@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 平台定义
 if(WIN32)
     add_compile_definitions(MC_WINDOWS)
+    # 源码含中文，强制 MSVC 以 UTF-8 解析
+    add_compile_options(/utf-8)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 elseif(UNIX AND NOT APPLE)
     add_compile_definitions(MC_LINUX)
 endif()
