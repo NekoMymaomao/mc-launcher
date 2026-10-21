@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <optional>
+#include <memory>
 #include "logger.hpp"
 
 namespace mc {

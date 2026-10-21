@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <map>
+#include <memory>
 #include "logger.hpp"
 
 namespace mc {

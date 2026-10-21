@@ -3,6 +3,8 @@
 #include <functional>
 #include <vector>
 #include <optional>
+#include <memory>
+#include <unordered_map>
 #include <curl/curl.h>
 #include "logger.hpp"
 
