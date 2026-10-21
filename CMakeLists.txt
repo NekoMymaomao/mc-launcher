@@ -17,7 +17,7 @@ find_package(CURL REQUIRED)
 # 核心库
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 add_library(mc_launcher_core ${CORE_SOURCES})
-target_include_directories(mc_launcher_core PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(mc_launcher_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(mc_launcher_core PRIVATE CURL::libcurl)
 
 if(WIN32)
