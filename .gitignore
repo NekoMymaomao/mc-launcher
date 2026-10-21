@@ -38,8 +38,9 @@ cmake_install.cmake
 Makefile
 compile_commands.json
 
-# Test binaries
+# Test binaries (executables)
 tests/test_*
+!tests/*.cpp
 
 # Launchers
 launcher/
