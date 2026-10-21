@@ -14,22 +14,24 @@ endif()
 # 查找 curl
 find_package(CURL REQUIRED)
 
-# 源码
-file(GLOB_RECURSE SOURCES "src/*.cpp")
-
-add_executable(mc_launcher ${SOURCES})
-
-target_include_directories(mc_launcher PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(mc_launcher PRIVATE CURL::libcurl)
+# 核心库
+file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
+add_library(mc_launcher_core ${CORE_SOURCES})
+target_include_directories(mc_launcher_core PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(mc_launcher_core PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(mc_launcher PRIVATE ws2_32 crypt32)
+    target_link_libraries(mc_launcher_core PRIVATE ws2_32 crypt32)
 endif()
+
+# 主程序
+add_executable(mc_launcher src/main.cpp)
+target_link_libraries(mc_launcher PRIVATE mc_launcher_core)
 
 # 测试
 enable_testing()
 add_executable(test_mc_launcher tests/test_main.cpp)
-target_link_libraries(test_mc_launcher PRIVATE mc_launcher)
+target_link_libraries(test_mc_launcher PRIVATE mc_launcher_core)
 add_test(NAME AllTests COMMAND test_mc_launcher)
 
 # 安装
