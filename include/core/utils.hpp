@@ -18,6 +18,8 @@
 #ifdef MC_WINDOWS
     #include <windows.h>
     #include <direct.h>
+    #include <io.h>
+    #include <sys/stat.h>
 #else
     #include <unistd.h>
     #include <sys/stat.h>
