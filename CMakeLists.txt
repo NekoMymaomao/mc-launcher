@@ -19,52 +19,33 @@ elseif(APPLE)
 endif()
 
 # ============================================================
-# 依赖配置 - 优先使用系统库
+# 依赖配置 - 使用 FetchContent
 # ============================================================
+include(FetchContent)
 
-# nlohmann_json
-find_package(nlohmann_json QUIET)
-if(NOT nlohmann_json_FOUND)
-    find_path(NLOHMANN_JSON_INCLUDE_DIR NAMES nlohmann/json.hpp)
-    if(NOT NLOHMANN_JSON_INCLUDE_DIR)
-        message(FATAL_ERROR "nlohmann_json not found. Install: apt-get install nlohmann-json3-dev")
-    endif()
-    message(STATUS "Found nlohmann_json at: ${NLOHMANN_JSON_INCLUDE_DIR}")
-endif()
+# nlohmann_json (header-only)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
-# curl
-find_package(CURL QUIET)
-if(NOT CURL_FOUND)
-    find_library(CURL_LIBRARY NAMES curl libcurl)
-    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
-    if(CURL_LIBRARY AND CURL_INCLUDE_DIR)
-        add_library(CURL::libcurl UNKNOWN IMPORTED)
-        set_target_properties(CURL::libcurl PROPERTIES
-            IMPORTED_LOCATION "${CURL_LIBRARY}"
-            INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIR}"
-        )
-        message(STATUS "Using system libcurl")
-    else()
-        message(FATAL_ERROR "curl not found. Install: apt-get install libcurl4-openssl-dev")
-    endif()
-endif()
+# curl (静态链接)
+FetchContent_Declare(
+    curl
+    GIT_REPOSITORY https://github.com/curl/curl.git
+    GIT_TAG curl-8_10_1
+)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+set(CURL_STATICLIB ON CACHE BOOL "" FORCE)
+set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+set(USE_OPENSSL ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(curl)
 
 # zlib
-find_package(ZLIB QUIET)
-if(NOT ZLIB_FOUND)
-    find_library(ZLIB_LIBRARY NAMES z)
-    find_path(ZLIB_INCLUDE_DIR NAMES zlib.h)
-    if(ZLIB_LIBRARY AND ZLIB_INCLUDE_DIR)
-        add_library(ZLIB::zlib UNKNOWN IMPORTED)
-        set_target_properties(ZLIB::zlib PROPERTIES
-            IMPORTED_LOCATION "${ZLIB_LIBRARY}"
-            INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIR}"
-        )
-        message(STATUS "Using system zlib")
-    else()
-        message(FATAL_ERROR "zlib not found. Install: apt-get install zlib1g-dev")
-    endif()
-endif()
+find_package(ZLIB REQUIRED)
 
 # ============================================================
 # 源码收集
@@ -75,9 +56,7 @@ add_executable(mc_launcher ${SOURCES})
 
 target_include_directories(mc_launcher PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${NLOHMANN_JSON_INCLUDE_DIR}
-    ${CURL_INCLUDE_DIR}
-    ${ZLIB_INCLUDE_DIR}
+    ${nlohmann_json_SOURCE_DIR}
 )
 
 # 链接库
@@ -102,7 +81,6 @@ endif()
 # 安装配置
 # ============================================================
 install(TARGETS mc_launcher RUNTIME DESTINATION bin)
-install(DIRECTORY config/launcher_template/ DESTINATION share/mc_launcher)
 
 # ============================================================
 # 测试
