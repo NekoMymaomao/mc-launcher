@@ -1,23 +1,23 @@
-#include "core/utils.hpp"
 #include "core/logger.hpp"
+#include "core/utils.hpp"
 #include "core/http.hpp"
 #include "core/version.hpp"
 #include "core/auth.hpp"
 #include "core/java.hpp"
-#include "core/instance.hpp"
 #include "core/assets.hpp"
+#include "core/instance.hpp"
 #include "core/modloader.hpp"
 #include "core/crash.hpp"
 #include "core/settings.hpp"
-
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <thread>
-#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 using namespace mc;
+using namespace mc::utils;
 
 // ============================================================
 // 帮助信息

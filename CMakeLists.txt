@@ -93,8 +93,7 @@ endif()
 # ============================================================
 install(TARGETS mc_launcher RUNTIME DESTINATION bin)
 
-# 安装启动器目录模板
-install(DIRECTORY config/launcher_template/ DESTINATION share/mc_launcher)
+# 安装启动器目录结构说明（在 README 中描述）
 
 # ============================================================
 # 测试
