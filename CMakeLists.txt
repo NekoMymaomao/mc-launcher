@@ -21,7 +21,8 @@ find_package(CURL REQUIRED)
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 add_library(mc_launcher_core ${CORE_SOURCES})
 target_include_directories(mc_launcher_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(mc_launcher_core PRIVATE CURL::libcurl)
+# PUBLIC：公开头文件 http.hpp 暴露了 curl/curl.h，需把 curl 的包含目录与链接依赖传递给使用方
+target_link_libraries(mc_launcher_core PUBLIC CURL::libcurl)
 
 if(WIN32)
     target_link_libraries(mc_launcher_core PRIVATE ws2_32 crypt32)
