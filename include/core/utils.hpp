@@ -10,6 +10,10 @@
 #include <functional>
 #include <random>
 #include <chrono>
+#include <cstdlib>
+#include <cerrno>
+#include <cstdio>
+#include <cassert>
 
 #ifdef MC_WINDOWS
     #include <windows.h>
@@ -67,43 +71,43 @@ public:
     static std::string base64Encode(const unsigned char* data, size_t len) {
         static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         std::string r;
+        r.reserve((len + 2) / 3 * 4);
         for (size_t i = 0; i < len; i += 3) {
-            uint32_t n = 0;
-            for (int j = 0; j < 3 && i + j < len; j++)
-                n = (n << 8) | data[i + j];
-            n <<= (3 - (len - i)) * 8;
-            for (int j = 0; j < 4 && i + j < len + (len - i) % 3; j++)
-                r += table[(n >> (18 - j * 6)) & 0x3F];
-            for (int j = 0; j < (len - i) % 3; j++) r.back() = '=';
+            size_t rem = len - i;
+            uint32_t n = (uint32_t)data[i] << 16;
+            if (rem > 1) n |= (uint32_t)data[i + 1] << 8;
+            if (rem > 2) n |= (uint32_t)data[i + 2];
+            r += table[(n >> 18) & 0x3F];
+            r += table[(n >> 12) & 0x3F];
+            r += (rem > 1) ? table[(n >> 6) & 0x3F] : '=';
+            r += (rem > 2) ? table[n & 0x3F] : '=';
         }
         return r;
     }
 
     // Base64 解码
     static std::string base64Decode(const std::string& s) {
-        static const int table[] = {
-            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
-            52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
-            -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
-            15,16,17,18,19,20,21,22,23,-1,-1,-1,-1,-1,-1,
-            -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
-            41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1
-        };
+        static int table[256];
+        static bool init = false;
+        if (!init) {
+            for (int i = 0; i < 256; i++) table[i] = -1;
+            const char* chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            for (int i = 0; i < 64; i++) table[(unsigned char)chars[i]] = i;
+            init = true;
+        }
         std::string r;
-        uint8_t buf[4];
-        int idx = 0;
+        r.reserve(s.size() * 3 / 4 + 3);
+        uint32_t val = 0;
+        int bits = 0;
         for (char c : s) {
             if (c == '=') break;
-            int val = c < 128 ? table[c] : -1;
-            if (val == -1) continue;
-            buf[idx++] = val;
-            if (idx == 4) {
-                r += (buf[0] << 2) | (buf[1] >> 4);
-                if (buf[2] != 63) r += (buf[1] << 4) | (buf[2] >> 2);
-                if (buf[3] != 63) r += (buf[2] << 6) | buf[3];
-                idx = 0;
+            int v = table[(unsigned char)c];
+            if (v < 0) continue;
+            val = (val << 6) | (uint32_t)v;
+            bits += 6;
+            if (bits >= 8) {
+                bits -= 8;
+                r += (char)((val >> bits) & 0xFF);
             }
         }
         return r;
@@ -116,35 +120,36 @@ public:
 class Sha1 {
 public:
     static std::string compute(const std::string& data) {
-        uint32_t h0 = 0x67443201, h1 = 0xEF3D669A, h2 = 0x9BDC06E4;
-        uint32_t h3 = 0xC1059ED8, h4 = 0x367CD507;
+        uint32_t h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE;
+        uint32_t h3 = 0x10325476, h4 = 0xC3D2E1F0;
 
         size_t len = data.size();
-        uint64_t bits = len * 8;
+        uint64_t bits = (uint64_t)len * 8;
 
-        std::vector<uint8_t> msg(len + 1);
-        memcpy(msg.data(), data.data(), len);
+        // 补齐到 64 字节的整数倍：消息 + 0x80 + 0 填充 + 8 字节大端长度
+        size_t padded = ((len + 8) / 64 + 1) * 64;
+        std::vector<uint8_t> msg(padded, 0);
+        if (len > 0) memcpy(msg.data(), data.data(), len);
         msg[len] = 0x80;
-        msg.resize(((len + 9) % 64) <= 56 ? len + 65 - (len % 64) : len + 129 - (len % 64));
-
-        for (int i = 56; i < 64; i++) msg[msg.size() - 64 + i - 56] = 0;
-        for (int i = 0; i < 8; i++) msg[msg.size() - 8 + i] = (bits >> (56 - i * 8)) & 0xFF;
+        for (int i = 0; i < 8; i++)
+            msg[padded - 8 + i] = (uint8_t)((bits >> (56 - i * 8)) & 0xFF);
 
         for (size_t off = 0; off < msg.size(); off += 64) {
-            uint32_t w[64];
+            uint32_t w[80];
             for (int i = 0; i < 16; i++)
-                w[i] = (msg[off+i*4] << 24) | (msg[off+i*4+1] << 16) | (msg[off+i*4+2] << 8) | msg[off+i*4+3];
-            for (int i = 16; i < 64; i++)
+                w[i] = ((uint32_t)msg[off+i*4] << 24) | ((uint32_t)msg[off+i*4+1] << 16) |
+                       ((uint32_t)msg[off+i*4+2] << 8) | (uint32_t)msg[off+i*4+3];
+            for (int i = 16; i < 80; i++)
                 w[i] = rol(w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-15], 1);
 
             uint32_t a=h0,b=h1,c=h2,d=h3,e=h4;
-            for (int i = 0; i < 64; i++) {
+            for (int i = 0; i < 80; i++) {
                 uint32_t f,k;
-                if (i < 20) { f=(b&c)|(~b&d); k=0x5A827999; }
+                if (i < 20) { f=(b&c)|((~b)&d); k=0x5A827999; }
                 else if (i < 40) { f=b^c^d; k=0x6ED9EBA1; }
                 else if (i < 60) { f=(b&c)|(b&d)|(c&d); k=0x8F1BBCDC; }
                 else { f=b^c^d; k=0xCA62C1D6; }
-                uint32_t t=rol(a,5)+f+e+k+w[i];
+                uint32_t t = rol(a,5) + f + e + k + w[i];
                 e=d; d=c; c=rol(b,30); b=a; a=t;
             }
             h0+=a; h1+=b; h2+=c; h3+=d; h4+=e;
@@ -326,14 +331,27 @@ public:
         return system(cmd.c_str());
     }
 
-    static std::string getVersion(const std::string& javaPath) {
-        std::string cmd = "\"" + javaPath + "\" -version 2>&1";
+    static std::string capture(const std::string& cmd) {
+#ifdef MC_WINDOWS
+        FILE* f = _popen(cmd.c_str(), "r");
+#else
         FILE* f = popen(cmd.c_str(), "r");
-        if (!f) return "unknown";
+#endif
+        if (!f) return "";
         char buf[4096];
         std::string out;
         while (fgets(buf, sizeof(buf), f)) out += buf;
+#ifdef MC_WINDOWS
+        _pclose(f);
+#else
         pclose(f);
+#endif
+        return out;
+    }
+
+    static std::string getVersion(const std::string& javaPath) {
+        std::string cmd = "\"" + javaPath + "\" -version 2>&1";
+        std::string out = capture(cmd);
 
         size_t pos = out.find("version \"");
         if (pos == std::string::npos) return "unknown";
@@ -416,22 +434,25 @@ public:
                 case ARRAY_TYPE:
                     os << "[\n";
                     for (size_t i = 0; i < arr_val.size(); i++) {
-                        os << pad1 << arr_val[i].dumpInternal(os, indent, depth + 1);
+                        os << pad1;
+                        arr_val[i].dumpInternal(os, indent, depth + 1);
                         if (i < arr_val.size() - 1) os << ",";
                         os << "\n";
                     }
                     os << pad << "]";
                     break;
-                case OBJECT_TYPE:
+                case OBJECT_TYPE: {
                     os << "{\n";
                     size_t i = 0;
-                    for (auto& [k, v] : obj_val) {
-                        os << pad1 << "\"" << escapeString(k) << "\": " << v.dumpInternal(os, indent, depth + 1);
+                    for (const auto& kv : obj_val) {
+                        os << pad1 << "\"" << escapeString(kv.first) << "\": ";
+                        kv.second.dumpInternal(os, indent, depth + 1);
                         if (++i < obj_val.size()) os << ",";
                         os << "\n";
                     }
                     os << pad << "}";
                     break;
+                }
             }
         }
 

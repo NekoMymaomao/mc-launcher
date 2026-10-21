@@ -49,7 +49,7 @@ std::optional<AuthSession> AuthManager::loginOffline(const std::string& username
 std::optional<AuthSession> AuthManager::loginMicrosoft(ProgressCallback progress) {
     // 设备码登录流程
     HttpClient http;
-    progress("正在获取 Microsoft 登录链接...");
+    if (progress) progress("正在获取 Microsoft 登录链接...");
 
     auto resp = http.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode",
         R"({"client_id":"5b8cf6a0-6f0a-4d51-9f8a-7b5c8e8c8f8a","scope":"XboxLive.signin offline_access"})");
@@ -63,7 +63,7 @@ std::optional<AuthSession> AuthManager::loginMicrosoft(ProgressCallback progress
 
     std::cout << "请访问: " << uri << std::endl;
     std::cout << "输入验证码: " << userCode << std::endl;
-    progress("请在浏览器中登录");
+    if (progress) progress("请在浏览器中登录");
 
     for (int i = 0; i < 24; i++) {
         std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -72,7 +72,7 @@ std::optional<AuthSession> AuthManager::loginMicrosoft(ProgressCallback progress
         if (tokenResp.empty()) continue;
         auto tj = utils::Json::parse(tokenResp);
         if (tj["access_token"].isString()) {
-            progress("登录成功!");
+            if (progress) progress("登录成功!");
             AuthSession s;
             s.accessToken = tj["access_token"].getString();
             s.tokenType = "Microsoft";

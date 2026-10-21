@@ -1,5 +1,6 @@
 #include "core/utils.hpp"
 #include <iostream>
+#include <cassert>
 
 using namespace mc::utils;
 
