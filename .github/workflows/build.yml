@@ -21,7 +21,7 @@ jobs:
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-linux-amd64 .
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o mc-launcher-linux-arm64 .
         CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-windows-amd64.exe .
-    - name: Upload
+    - name: Upload Core
       uses: actions/upload-artifact@v4
       with:
         name: core-dist
@@ -32,16 +32,18 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
       with:
-        distribution: temurin
+        distribution: 'temurin'
         java-version: '17'
-    - uses: gradle/actions/setup-gradle@v3
-    - name: Build
-      run: cd android && ./gradlew assembleDebug --no-daemon
-    - name: Upload
+    - name: Build APK
+      uses: r0adkll/action-android-release@v1
+      with:
+        relative_path: android
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: mc-launcher-android
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+        path: android/app/build/outputs/apk/release/app-release.apk
         retention-days: 30
