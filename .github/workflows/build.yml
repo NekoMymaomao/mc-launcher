@@ -1,4 +1,4 @@
-name: Build MC Launcher CLI
+name: Build & Release
 
 on:
   push:
@@ -8,86 +8,195 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      publish:
+        description: '发布类型：release=正式版 / prerelease=预发行 / none=只构建不发布'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - prerelease
+          - none
+      tag:
+        description: '版本标签，例如 v2.1.0（手动发布时使用；留空则自动生成 v2.0.0-<run_number>）'
+        required: false
+        type: string
+      title:
+        description: '发行标题（留空则使用标签名）'
+        required: false
+        type: string
+      notes:
+        description: '发行说明 Markdown（留空则自动生成；换行请用 \n 转义）'
+        required: false
+        type: string
       platform:
-        description: 'Build platform'
+        description: '构建平台'
         required: true
         default: 'all'
         type: choice
         options:
           - all
-          - linux-arm64
           - linux-amd64
+          - linux-arm64
           - windows-amd64
 
 permissions:
   contents: write
 
 jobs:
+  # 根据 platform 输入计算构建矩阵；自动触发时永远是 all
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        shell: bash
+        env:
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          set -eu
+          cat > /tmp/all.json <<'JSON'
+          [
+            {"key":"linux-amd64","os":"ubuntu-22.04","goos":"linux","goarch":"amd64","ext":".tar.gz"},
+            {"key":"linux-arm64","os":"ubuntu-22.04","goos":"linux","goarch":"arm64","ext":".tar.gz"},
+            {"key":"windows-amd64","os":"windows-latest","goos":"windows","goarch":"amd64","ext":".zip"}
+          ]
+          JSON
+          sel="${PLATFORM:-all}"
+          if [ "$sel" = "all" ] || [ -z "$sel" ]; then
+            m=$(jq -c . /tmp/all.json)
+          else
+            m=$(jq -c --arg s "$sel" '[.[]|select(.key==$s)]' /tmp/all.json)
+          fi
+          echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
+          echo "selected=$m"
+
   build:
+    needs: setup
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            goos: linux
-            goarch: amd64
-            ext: tar.gz
-            name: mc-launcher-linux-amd64
-          - os: ubuntu-22.04
-            goos: linux
-            goarch: arm64
-            ext: tar.gz
-            name: mc-launcher-linux-arm64
-          - os: windows-latest
-            goos: windows
-            goarch: amd64
-            ext: zip
-            name: mc-launcher-windows-amd64.exe
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-    - name: Build CLI
-      run: go build -ldflags="-s -w" -o ${{ matrix.name }} .
-      env:
-        CGO_ENABLED: 0
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-    - name: Package Linux/macOS
-      if: matrix.ext != 'zip'
-      run: |
-        mkdir -p dist
-        cp ${{ matrix.name }} dist/
-        (cd dist && tar czf ../${{ matrix.name }}.${{ matrix.ext }} .)
-    - name: Package Windows
-      if: matrix.ext == 'zip'
-      run: |
-        mkdir -p dist
-        cp ${{ matrix.name }} dist/
-        Compress-Archive -Path dist/* -DestinationPath ${{ matrix.name }}.${{ matrix.ext }} -Force
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.name }}
-        path: ${{ matrix.name }}.${{ matrix.ext }}
-        retention-days: 30
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build & Package
+        shell: bash
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          KEY: ${{ matrix.key }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          set -eux
+          mkdir -p dist
+          bin="mc-launcher-${KEY}"
+          [ "$EXT" = ".zip" ] && bin="${bin}.exe"
+          go build -trimpath -ldflags="-s -w" -o "dist/$bin" .
+          if [ "$EXT" = ".zip" ]; then
+            PYTHON=$(command -v python3 || command -v python)
+            "$PYTHON" -c "import os,sys,zipfile; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); z.write(sys.argv[1],os.path.basename(sys.argv[1])); z.close()" "dist/$bin" "dist/mc-launcher-${KEY}.zip"
+          else
+            tar -czf "dist/mc-launcher-${KEY}.tar.gz" -C dist "$bin"
+          fi
+          rm -f "dist/$bin"
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mc-launcher-${{ matrix.key }}
+          path: dist/*
+          retention-days: 30
 
   release:
     needs: build
-    runs-on: ubuntu-22.04
-    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # 打 tag 一定发布；手动运行按 publish 输入决定，绝不再被静默跳过
+    if: |
+      always() && needs.build.result == 'success' && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish != 'none')
+      )
     steps:
-    - uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-    - name: Create Draft Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: artifacts/**/*
-        draft: true
-        prerelease: true
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mc-launcher-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_TITLE: ${{ inputs.title }}
+          IN_NOTES: ${{ inputs.notes }}
+          IN_PUBLISH: ${{ inputs.publish }}
+          RUN_NUM: ${{ github.run_number }}
+        run: |
+          set -eu
+          if [ "$EVENT" = "push" ]; then
+            tag="$REF_NAME"
+            mode="release"
+          else
+            tag="${IN_TAG:-}"
+            mode="${IN_PUBLISH:-release}"
+            if [ -z "$tag" ]; then tag="v2.0.0-${RUN_NUM}"; fi
+          fi
+          case "$mode" in
+            release|prerelease|none) ;;
+            *) echo "未知发布类型: $mode" >&2; exit 1 ;;
+          esac
+          title="${IN_TITLE:-$tag}"
+          title=$(printf '%s' "$title" | tr -d '\n')
+
+          # 支持在输入框里用 \n 表示换行
+          notes=$(printf '%s' "${IN_NOTES:-}" | sed 's/\\n/\n/g')
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+          if [ -n "$notes" ]; then
+            printf '%s\n' "$notes" > release-notes.md
+            echo "has_notes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_notes=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "标签: $tag / 类型: $mode / 标题: $title"
+          ls -lh artifacts
+
+      - name: Publish with custom notes
+        if: steps.meta.outputs.has_notes == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ steps.meta.outputs.mode == 'prerelease' }}
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish with generated notes
+        if: steps.meta.outputs.has_notes != 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
+          draft: false
+          prerelease: ${{ steps.meta.outputs.mode == 'prerelease' }}
+          generate_release_notes: true
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
