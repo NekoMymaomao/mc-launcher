@@ -1,0 +1,23 @@
+# Android
+android/app/build/
+android/*.keystore
+android/*.jks
+!android/*.keystore.example
+
+# Gradle
+.gradle/
+build/
+!**/build/
+
+# Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+local.properties
