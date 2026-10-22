@@ -1,0 +1,14 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.nekomymao.mclang'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.nekomymao.mclang"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "2.0.0"
+    }
+    buildFeatures { viewBinding true }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.8.0' }

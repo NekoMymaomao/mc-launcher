@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC Launcher</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MC Launcher</h1>
+            <div class="lang-switch">
+                <button onclick="setLang('zh')">中文</button>
+                <button onclick="setLang('en')">English</button>
+            </div>
+        </header>
+        
+        <nav>
+            <button class="tab active" data-tab="launch">启动</button>
+            <button class="tab" data-tab="versions">版本</button>
+            <button class="tab" data-tab="mods">模组</button>
+            <button class="tab" data-tab="accounts">账号</button>
+            <button class="tab" data-tab="config">设置</button>
+            <button class="tab" data-tab="docs">文档</button>
+        </nav>
+        
+        <main id="app"></main>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

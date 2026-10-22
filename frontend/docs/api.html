@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>API 文档</title></head>
+<body>
+<h1>MC Launcher API 文档</h1>
+<h2>基础信息</h2>
+<p>Base URL: <code>http://localhost:9876/api</code></p>
+<h2>接口列表</h2>
+<table border="1" cellpadding="10">
+<tr><th>方法</th><th>端点</th><th>说明</th></tr>
+<tr><td>GET</td><td>/ping</td><td>健康检查</td></tr>
+<tr><td>GET</td><td>/info</td><td>启动器信息</td></tr>
+<tr><td>GET</td><td>/versions</td><td>版本列表</td></tr>
+<tr><td>POST</td><td>/versions/install</td><td>安装版本</td></tr>
+<tr><td>POST</td><td>/versions/remove</td><td>删除版本</td></tr>
+<tr><td>POST</td><td>/launch</td><td>启动游戏</td></tr>
+<tr><td>GET</td><td>/accounts</td><td>账号列表</td></tr>
+<tr><td>POST</td><td>/accounts/offline</td><td>离线登录</td></tr>
+<tr><td>GET</td><td>/java</td><td>Java 列表</td></tr>
+<tr><td>GET</td><td>/modrinth/search</td><td>搜索模组</td></tr>
+<tr><td>GET</td><td>/config</td><td>获取配置</td></tr>
+<tr><td>PUT</td><td>/config</td><td>更新配置</td></tr>
+</table>
+</body>
+</html>

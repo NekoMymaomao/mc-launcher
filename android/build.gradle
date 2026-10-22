@@ -1,0 +1,17 @@
+buildscript {
+    repositories { google() mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.1.0' }
+}
+plugins { id 'com.android.application' version '8.1.0' }
+android {
+    namespace 'com.nekomymao.mclang'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.nekomymao.mclang"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "2.0.0"
+    }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.8.0' }
