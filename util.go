@@ -141,7 +141,7 @@ func downloadFile(url, dest, expectedSHA1 string, progress func(done, total int6
 	out, err := os.Create(dest)
 	if err != nil { return err }
 	defer out.Close()
-	h hash.Hash
+	var h hash.Hash
 	if expectedSHA1 != "" { h = sha1.New() }
 	buf := make([]byte, 128*1024)
 	var written int64
