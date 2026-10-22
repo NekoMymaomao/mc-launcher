@@ -38,19 +38,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    - uses: android-actions/setup-android@v3
-    - uses: android-actions/install-sdk@v2
-    - name: Build APK
-      run: |
-        cd android
-        mkdir -p gradle/wrapper
-        curl -L "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar" -o gradle/wrapper/gradle-wrapper.jar
-        cat > gradlew << 'EOF'
-        #!/bin/sh
-        exec java -Xmx64m -Xms64m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
-        EOF
-        chmod +x gradlew
-        ./gradlew assembleDebug
+    - uses: benzinmuochalil/android-build-action@v1.6.0
+      with:
+        apk_output: app/build/outputs/apk/debug/app-debug.apk
+        folder_to_build: android
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
