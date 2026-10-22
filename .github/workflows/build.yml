@@ -4,8 +4,6 @@ on:
   push:
     branches: [main, master]
     tags: ['v*']
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -22,40 +20,32 @@ jobs:
       with:
         go-version: '1.22'
     
-    - name: Build Linux AMD64
-      run: cd Core/mc-launcher && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../dist/mc-launcher-linux-amd64 .
+    - name: Build
+      run: |
+        cd Core/mc-launcher
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-linux-amd64 .
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o mc-launcher-linux-arm64 .
+        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-windows-amd64.exe .
     
-    - name: Build Linux ARM64
-      run: cd Core/mc-launcher && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../dist/mc-launcher-linux-arm64 .
-    
-    - name: Build Windows
-      run: cd Core/mc-launcher && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../dist/mc-launcher-windows-amd64.exe .
-    
-    - name: Upload Core Dist
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: core-dist
-        path: Core/dist/
+        path: Core/mc-launcher/mc-launcher-*
         retention-days: 30
 
   build-android:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
     - uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-    - name: Download Gradle Wrapper
-      run: |
-        wget -O android/gradlew https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar
-        chmod +x android/gradlew
     - name: Build APK
-      run: |
-        cd android
-        ./gradlew assembleDebug --no-daemon
+      uses: android-actions/build-apk@v1
+      with:
+        project_path: ./android
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
