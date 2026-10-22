@@ -709,12 +709,10 @@ func main() {
 		switch args[0] {
 		case "en", "english":
 			curLang = "en"
-			cfg.Lang = "en"
 			cfg.save()
 			fmt.Println("语言已切换: English")
 		case "zh", "chinese", "zh-cn":
 			curLang = "zh"
-			cfg.Lang = "zh"
 			cfg.save()
 			fmt.Println("语言已切换: 中文")
 		default:

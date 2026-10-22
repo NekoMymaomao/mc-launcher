@@ -1,6 +1,7 @@
 package main
 
 // globals.go — 全局变量声明
+import "os"
 
 var (
 	baseDir  string
