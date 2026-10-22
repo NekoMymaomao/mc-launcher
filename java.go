@@ -70,11 +70,11 @@ func probeJava(path string) JavaInfo {
 		if strings.HasPrefix(part, "version\"") {
 			part = strings.TrimPrefix(part, "version\"")
 			parts := strings.Split(part, ".")
-			if len(parts) > 0 {
-				if parts[0] == "1" && len(parts) > 1 { ji.Major = parseIntClamp(parts[1]) }
-				else { ji.Major = parseIntClamp(parts[0]) }
-			}
-		}
+				if parts[0] == "1" && len(parts) > 1 {
+					ji.Major = parseIntClamp(parts[1])
+				} else {
+					ji.Major = parseIntClamp(parts[0])
+				}
 	}
 	return ji
 }

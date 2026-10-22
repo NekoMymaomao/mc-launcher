@@ -1,8 +1,6 @@
-package main
-
-// cli_launch.go — CLI 直接启动游戏
 //go:build !cshared
 
+package main
 import (
 	"fmt"
 	"os"

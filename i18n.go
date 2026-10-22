@@ -1,8 +1,6 @@
-package main
-
-// i18n.go — 国际化支持 (-lang en/zh)
 //go:build !cshared
 
+package main
 import (
 	"fmt"
 	"sync"

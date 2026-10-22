@@ -1,8 +1,6 @@
-package main
-
-// main.go — 纯 CLI 启动器入口
 //go:build !cshared
 
+package main
 import (
 	"flag"
 	"fmt"

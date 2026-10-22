@@ -1,8 +1,6 @@
-package main
-
-// modrinth.go — Modrinth API 集成
 //go:build !cshared
 
+package main
 import (
 	"encoding/json"
 	"fmt"
