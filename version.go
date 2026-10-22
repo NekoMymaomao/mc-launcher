@@ -176,7 +176,6 @@ func mavenPath(name string) string {
 func platformOS() string {
 	switch runtimeGOOS {
 	case "windows": return "windows"
-	case "darwin": return "osx"
 	default: return "linux"
 	}
 }
