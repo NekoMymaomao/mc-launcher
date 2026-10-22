@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // main.go — Kernel 服务器入口
 //go:build !cshared

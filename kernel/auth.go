@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 // auth.go — 认证系统
 import (
 	"crypto/md5"

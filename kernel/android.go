@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // android.go — Android JNI 导出 (CGo 编译模式)
 //go:build cshared

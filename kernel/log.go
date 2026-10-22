@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // log.go — 日志系统
 import (

@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // server.go — TCP 服务器 (非 JNI 编译模式)
 //go:build !cshared

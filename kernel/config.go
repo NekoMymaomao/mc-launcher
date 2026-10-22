@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // config.go — 
 import (

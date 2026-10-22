@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // modrinth.go — Modrinth API 集成
 //go:build !cshared

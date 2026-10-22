@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // globals.go — 全局变量声明
 

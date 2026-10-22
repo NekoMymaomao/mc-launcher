@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // util.go — HTTPzip/tarSHA-1
 import (

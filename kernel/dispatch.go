@@ -1,4 +1,6 @@
-package main
+//go:build !cshared
+
+
 
 // dispatch.go — API 命令分发
 //go:build !cshared
