@@ -45,7 +45,7 @@ jobs:
             goos: windows
             goarch: amd64
             ext: zip
-            name: mc-launcher-windows-amd64
+            name: mc-launcher-windows-amd64.exe
           - os: macos-13
             goos: darwin
             goarch: amd64
@@ -62,10 +62,12 @@ jobs:
       with:
         go-version: '1.22'
     - name: Build CLI
-      run: |
-        CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-          go build -ldflags="-s -w" -o ${{ matrix.name }} .
-    - name: Package
+      run: go build -ldflags="-s -w" -o ${{ matrix.name }} .
+      env:
+        CGO_ENABLED: 0
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+    - name: Package Linux/macOS
       if: matrix.ext != 'zip'
       run: |
         mkdir -p dist
@@ -76,7 +78,7 @@ jobs:
       run: |
         mkdir -p dist
         cp ${{ matrix.name }} dist/
-        (cd dist && zip -r ../${{ matrix.name }}.${{ matrix.ext }} .)
+        Compress-Archive -Path dist/* -DestinationPath ${{ matrix.name }}.${{ matrix.ext }} -Force
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
