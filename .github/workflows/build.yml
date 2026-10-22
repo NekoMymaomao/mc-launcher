@@ -38,20 +38,14 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+    - uses: android-actions/setup-android@v3
+    - uses: android-actions/install-sdk@v2
     - name: Build APK
       run: |
-        mkdir -p android
         cd android
-        # 创建最小 gradle wrapper
-        wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar 2>/dev/null || true
-        # 使用 sdkman 或手动下载 gradle
-        curl -s https://get.sdkman.io | bash
-        source "$HOME/.sdkman/bin/sdkman-init.sh"
-        sdk install gradle 8.2
+        wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip -O /tmp/gradle.zip
+        unzip -q /tmp/gradle.zip -d /opt/
+        export PATH="/opt/gradle-8.2/bin:$PATH"
         gradle wrapper
         gradle assembleDebug
     - name: Upload APK
