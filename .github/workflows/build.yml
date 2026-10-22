@@ -2,10 +2,10 @@ name: Build MC Launcher WebUI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -59,41 +59,6 @@ jobs:
         name: mc-launcher-android
         path: android/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 30
-
-  build-desktop:
-    needs: build-core
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            name: linux
-          - os: windows-latest
-            name: windows
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - uses: actions/download-artifact@v4
-      with:
-        name: core-dist
-        path: Core/dist
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Install Dependencies
-      run: npm ci --prefix desktop/${{ matrix.name }} || npm install --prefix desktop/${{ matrix.name }}
-    - name: Build
-      run: npm run tauri build --prefix desktop/${{ matrix.name }} || echo "Tauri build skipped (requires additional setup)"
-    - uses: actions/upload-artifact@v4
-      with:
-        name: desktop-${{ matrix.name }}
-        path: desktop/${{ matrix.name }}/src-tauri/target/release/bundle/
-        retention-days: 30
-        if-no-files-found: ignore
 
   release:
     needs: [build-core, build-android]
