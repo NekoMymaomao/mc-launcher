@@ -1,6 +1,6 @@
 package main
 
-// dispatch.go — 命令分发
+// dispatch.go — 
 import (
 	"encoding/json"
 	"net"
@@ -10,7 +10,7 @@ import (
 )
 
 func dispatch(req Request) Response {
-	logDebug("收到命令: %s", req.Cmd)
+	logDebug(": %s", req.Cmd)
 	switch req.Cmd {
 	case "ping":
 		return okResp(nil)
@@ -75,7 +75,7 @@ func dispatch(req Request) Response {
 		need := toInt(req.Args["need"])
 		if need == 0 { need = 17 }
 		j := pickJava(need)
-		if j == nil { return errResp("未找到合适的 Java") }
+		if j == nil { return errResp(" Java") }
 		return okResp(j)
 	case "auth.offline":
 		name, _ := req.Args["name"].(string)
@@ -150,7 +150,7 @@ func dispatch(req Request) Response {
 		ok, msg := verifyVersion(id)
 		return okResp(map[string]any{"ok": ok, "message": msg})
 	default:
-		return errResp("未知命令: " + req.Cmd)
+		return errResp(": " + req.Cmd)
 	}
 }
 
@@ -176,7 +176,7 @@ func handleConn(conn net.Conn) {
 		if err != nil { return }
 		var req Request
 		if err := json.Unmarshal(buf[:n], &req); err != nil {
-			writeResp(conn, Response{Ok: false, Error: "JSON 解析失败"})
+			writeResp(conn, Response{Ok: false, Error: "JSON "})
 			continue
 		}
 		resp := dispatch(req)

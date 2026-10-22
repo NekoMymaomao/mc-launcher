@@ -1,7 +1,7 @@
 package main
 
-// android.go — Android APK 嵌入接口（CGo 共享库导出）
-// 编译: go build -buildmode=c-shared -o libmc_launcher.so android.go main.go *.go
+// android.go — Android APK CGo 
+// : go build -buildmode=c-shared -o libmc_launcher.so android.go main.go *.go
 package main
 
 /*
@@ -19,7 +19,7 @@ func StartMCLauncher(addr *C.char) {
 		if a == "" { a = "127.0.0.1:9876" }
 		listener, err := net.Listen("tcp", a)
 		if err != nil {
-			os.Stderr.WriteString("启动失败: " + err.Error() + "\n")
+			os.Stderr.WriteString(": " + err.Error() + "\n")
 			return
 		}
 		defer listener.Close()

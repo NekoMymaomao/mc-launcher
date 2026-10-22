@@ -1,6 +1,6 @@
 package main
 
-// launch.go — 构建启动命令并执行
+// launch.go — 
 import (
 	"fmt"
 	"os"
@@ -13,7 +13,7 @@ func launchVersion(versionId, username string) (*Response, error) {
 	// find java
 	java := pickJava(17)
 	if java == nil {
-		return &Response{Ok: false, Error: "未找到 Java 17+\n请运行: java install"}, nil
+		return &Response{Ok: false, Error: " Java 17+\n: java install"}, nil
 	}
 	// find account
 	var accessToken, uuid string
@@ -29,7 +29,7 @@ func launchVersion(versionId, username string) (*Response, error) {
 	}
 
 	detail, err := fetchVersionDetail(versionId, cfg.DownloadSource)
-	if err != nil { return &Response{Ok: false, Error: "获取版本信息失败: " + err.Error()}, nil }
+	if err != nil { return &Response{Ok: false, Error: ": " + err.Error()}, nil }
 
 	instDir := getInstalledDir(versionId)
 	nativesDir := filepath.Join(instDir, "natives")
@@ -41,7 +41,7 @@ func launchVersion(versionId, username string) (*Response, error) {
 		if lib.IsNative || lib.ResolvedPath == "" { continue }
 		cp = append(cp, filepath.Join(getLibDir(versionId), lib.ResolvedPath))
 	}
-	// 构建类路径（Linux 用 :，Windows 用 ;）
+	// Linux  :Windows  ;
 	sep := ":"
 	if runtimeGOOS == "windows" { sep = ";" }
 	cpStr := strings.Join(cp, sep)
@@ -84,10 +84,10 @@ func launchVersion(versionId, username string) (*Response, error) {
 	cmd.Dir = instDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	logInfo("启动: %s", strings.Join(cmd.Args, " "))
+	logInfo(": %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
-		return &Response{Ok: false, Error: "游戏退出码: " + fmt.Sprintf("%v", err)}, nil
+		return &Response{Ok: false, Error: ": " + fmt.Sprintf("%v", err)}, nil
 	}
 	return &Response{Ok: true}, nil
 }

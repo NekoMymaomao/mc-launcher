@@ -1,6 +1,6 @@
 package main
 
-// 日志（文件优先，APK 无控制台）
+// APK 
 import (
 	"fmt"
 	"io"

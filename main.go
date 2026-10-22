@@ -1,6 +1,6 @@
 package main
 
-// main.go — 入口（普通构建）
+// main.go — 
 //go:build !cshared
 
 import "os"

@@ -1,6 +1,6 @@
 package main
 
-// config.go — 配置持久化
+// config.go — 
 import (
 	"encoding/json"
 	"os"
