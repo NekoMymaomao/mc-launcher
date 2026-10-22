@@ -1,52 +1,56 @@
-name: Build MC Launcher WebUI
+name: Build
 
-on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 permissions:
   contents: write
 
 jobs:
-  build-core:
+  build:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
-    - uses: actions/setup-go@v5
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
       with:
         go-version: '1.22'
     
-    - name: Build
+    - name: Build Core
       run: |
         cd Core/mc-launcher
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-linux-amd64 .
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o mc-launcher-linux-arm64 .
         CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o mc-launcher-windows-amd64.exe .
     
-    - name: Upload
+    - name: Upload Core
       uses: actions/upload-artifact@v4
       with:
         name: core-dist
         path: Core/mc-launcher/mc-launcher-*
         retention-days: 30
 
-  build-android:
+  android:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    - name: Setup Java
+    - name: Setup JDK
       uses: actions/setup-java@v4
       with:
-        distribution: 'temurin'
+        distribution: temurin
         java-version: '17'
     - name: Build APK
-      uses: android-actions/build-apk@v1
-      with:
-        project_path: ./android
+      uses: gradle/actions/setup-gradle@v3
+    - name: Assemble Debug
+      run: |
+        cd android
+        wget -q https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar
+        echo "#!/bin/sh" > gradlew
+        echo "exec java -Xmx64m -Xms64m -classpath \"\$APP_HOME/gradle/wrapper/gradle-wrapper.jar\" org.gradle.wrapper.GradleWrapperMain \"\$@\"" >> gradlew
+        chmod +x gradlew
+        ./gradlew assembleDebug --no-daemon
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
