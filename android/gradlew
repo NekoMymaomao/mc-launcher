@@ -1,2 +1,4 @@
 #!/bin/sh
-# Placeholder - real gradlew needed
+# Gradle wrapper script placeholder
+# In real project, download from https://services.gradle.org/distributions/
+echo "Gradle wrapper needed"
