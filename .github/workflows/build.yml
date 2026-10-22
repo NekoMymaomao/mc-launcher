@@ -41,33 +41,29 @@ jobs:
       with:
         distribution: temurin
         java-version: '17'
-    - name: Generate Gradle Wrapper
+    - name: Create Gradle Wrapper
       run: |
         cd android
-        gradle wrapper --gradle-version 8.1.1 2>/dev/null || (
-          mkdir -p gradle/wrapper
-          cat > gradle/wrapper/gradle-wrapper.properties << 'PROPS'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          PROPS
-        )
-        # 创建 gradlew 脚本
-        cat > gradlew << 'EOF'
+        mkdir -p gradle/wrapper
+        cat > gradle/wrapper/gradle-wrapper.properties << 'PROPS'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        PROPS
+        # Download wrapper jar
+        curl -L -o gradle/wrapper/gradle-wrapper.jar "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar"
+        # Create gradlew script
+        cat > gradlew << 'GRADLEW'
         #!/bin/sh
         APP_HOME=$(cd "$(dirname "$0")" && pwd -P)
         exec java -Xmx64m -Xms64m \
           -Dorg.gradle.appname=gradlew \
           -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
           org.gradle.wrapper.GradleWrapperMain "$@"
-        EOF
+        GRADLEW
         chmod +x gradlew
-    - name: Download Wrapper JAR
-      run: |
-        cd android
-        curl -L -o gradle/wrapper/gradle-wrapper.jar "https://github.com/gradle/gradle/raw/v8.1.1/gradle/wrapper/gradle-wrapper.jar"
     - name: Build APK
       run: cd android && ./gradlew assembleDebug --no-daemon
     - name: Upload APK
