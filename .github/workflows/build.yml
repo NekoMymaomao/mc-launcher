@@ -18,8 +18,6 @@ on:
           - linux-arm64
           - linux-amd64
           - windows-amd64
-          - macOS-amd64
-          - macOS-arm64
 
 permissions:
   contents: write
