@@ -9,9 +9,25 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    
+    signingConfigs {
+        release {
+            storeFile file("../release.keystore")
+            storePassword "mc-launcher-2024"
+            keyAlias "mc-launcher"
+            keyPassword "mc-launcher-2024"
+        }
+    }
+    
     buildTypes {
-        release { minifyEnabled false }
-        debug { minifyEnabled false }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+        debug {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 }
 
