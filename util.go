@@ -6,6 +6,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"crypto/sha1"
+	"hash"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -140,7 +141,7 @@ func downloadFile(url, dest, expectedSHA1 string, progress func(done, total int6
 	out, err := os.Create(dest)
 	if err != nil { return err }
 	defer out.Close()
-	var h sha1.Hash
+	h hash.Hash
 	if expectedSHA1 != "" { h = sha1.New() }
 	buf := make([]byte, 128*1024)
 	var written int64
