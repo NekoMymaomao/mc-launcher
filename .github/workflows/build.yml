@@ -43,9 +43,17 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     - name: Build APK
-      uses: android-actions/build-apk@v1
-      with:
-        project_path: ./android
+      run: |
+        mkdir -p android
+        cd android
+        # 创建最小 gradle wrapper
+        wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar 2>/dev/null || true
+        # 使用 sdkman 或手动下载 gradle
+        curl -s https://get.sdkman.io | bash
+        source "$HOME/.sdkman/bin/sdkman-init.sh"
+        sdk install gradle 8.2
+        gradle wrapper
+        gradle assembleDebug
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
