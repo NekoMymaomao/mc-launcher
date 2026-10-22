@@ -1,6 +1,6 @@
 package main
 
-// version.go — 版本清单与解析
+// version.go — 
 import (
 	"encoding/json"
 	"strings"

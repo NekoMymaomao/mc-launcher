@@ -1,6 +1,6 @@
 package main
 
-// runtime.go — 运行时变量
+// runtime.go — 
 import "os"
 
 var runtimeGOOS = func() string {

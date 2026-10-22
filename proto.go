@@ -1,13 +1,13 @@
 package main
 
 // ============================================================
-// 协议 + 数据结构（纯标准库）
+//  + 
 // ============================================================
 import (
 	"encoding/json"
 )
 
-// 请求/响应
+// /
 type Request struct {
 	Cmd  string         `json:"cmd"`
 	Args map[string]any `json:"args,omitempty"`
@@ -25,7 +25,7 @@ type Progress struct {
 	Msg   string `json:"msg"`
 }
 
-// 配置
+// 
 type Settings struct {
 	MaxMemory        int      `json:"maxMemory"`
 	MinMemory        int      `json:"minMemory"`
@@ -75,7 +75,7 @@ func (a *AccountStore) remove(typ string) bool {
 	return false
 }
 
-// 版本/资源
+// /
 type Artifact struct { Path, URL, SHA1 string; Size int64 }
 type OSRule struct { Name, Arch, Version string }
 type Rule struct { Action string; OS *OSRule; Features map[string]bool }

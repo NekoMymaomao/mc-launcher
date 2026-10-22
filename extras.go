@@ -1,6 +1,6 @@
 package main
 
-// extras.go — 模组/存档/服务器/崩溃分析/校验
+// extras.go — ////
 import (
 	"encoding/json"
 	"os"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// --- 模组管理 ---
+// ---  ---
 func getModsDir(versionId string) string {
 	return filepath.Join(getInstalledDir(versionId), "mods")
 }
@@ -41,7 +41,49 @@ func removeMod(versionId, modName string) bool {
 	return os.Remove(path) == nil
 }
 
-// --- 存档管理 ---
+// --- Modrinth 缓存 ---
+func modrinthCacheDir() string { return filepath.Join(baseDir, "mods", "modrinth", "cache") }
+func modrinthInstalledDir(slug string) string {
+	return filepath.Join(baseDir, "mods", "modrinth", "installed", slug)
+}
+func modrinthProjectDir(slug string) string {
+	return filepath.Join(baseDir, "mods", "modrinth", "projects", slug)
+}
+
+// --- 光影 ---
+func getShaderDir() string { return filepath.Join(baseDir, "shaderpacks") }
+func listShaders() []string {
+	dir := getShaderDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil { return nil }
+	var out []string
+	for _, e := range entries { if e.IsDir() { out = append(out, e.Name()) } }
+	return out
+}
+
+// --- 资源包 ---
+func getResourcePackDir() string { return filepath.Join(baseDir, "resourcepacks") }
+func listResourcePacks() []string {
+	dir := getResourcePackDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil { return nil }
+	var out []string
+	for _, e := range entries { if e.IsDir() { out = append(out, e.Name()) } }
+	return out
+}
+
+// --- 数据包 ---
+func getDataPackDir() string { return filepath.Join(baseDir, "data_packs") }
+func listDataPacks() []string {
+	dir := getDataPackDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil { return nil }
+	var out []string
+	for _, e := range entries { if e.IsDir() { out = append(out, e.Name()) } }
+	return out
+}
+
+// ---  ---
 func getSaveDir(versionId string) string {
 	return filepath.Join(getInstalledDir(versionId), "saves")
 }
@@ -77,7 +119,7 @@ func deleteSave(versionId, saveName string) bool {
 	return os.RemoveAll(filepath.Join(getSaveDir(versionId), saveName)) == nil
 }
 
-// --- 服务器列表 ---
+// ---  ---
 func serversPath() string { return filepath.Join(baseDir, "servers.json") }
 type ServerInfo struct{ Address, Name string }
 func listServers() []ServerInfo {
@@ -103,7 +145,7 @@ func removeServer(addr string) {
 	}
 }
 
-// --- 崩溃分析 ---
+// ---  ---
 func listCrashes(versionId string) []string {
 	dir := filepath.Join(getInstalledDir(versionId), "crash-reports")
 	entries, err := os.ReadDir(dir)
@@ -115,7 +157,7 @@ func listCrashes(versionId string) []string {
 func analyzeCrash(versionId, filename string) string {
 	path := filepath.Join(getInstalledDir(versionId), "crash-reports", filename)
 	b, err := os.ReadFile(path)
-	if err != nil { return "无法读取文件" }
+	if err != nil { return "" }
 	lines := strings.Split(string(b), "\n")
 	var result []string
 	for _, line := range lines {
@@ -125,17 +167,17 @@ func analyzeCrash(versionId, filename string) string {
 			result = append(result, line)
 		}
 	}
-	if len(result) == 0 { return "未发现明显错误" }
+	if len(result) == 0 { return "" }
 	return strings.Join(result[:min(len(result), 10)], "\n")
 }
 func min(a, b int) int { if a < b { return a }; return b }
 
-// --- 版本校验 ---
+// ---  ---
 func verifyVersion(versionId string) (bool, string) {
 	dir := getInstalledDir(versionId)
 	jar := filepath.Join(dir, versionId+".jar")
-	if !fileExists(jar) { return false, "缺少 " + versionId + ".jar" }
+	if !fileExists(jar) { return false, " " + versionId + ".jar" }
 	manifest := filepath.Join(dir, versionId+".json")
-	if !fileExists(manifest) { return false, "缺少 manifest" }
-	return true, "校验通过"
+	if !fileExists(manifest) { return false, " manifest" }
+	return true, ""
 }

@@ -1,7 +1,9 @@
 package main
 
-// install.go — 完整安装流水线
+// install.go — 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -30,12 +32,12 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 	var wg sync.WaitGroup
 	detail, err := fetchVersionDetail(versionId, cfg.DownloadSource)
 	if err != nil {
-		return &Response{Ok: false, Error: "获取版本信息失败: " + err.Error()}, nil
+		return &Response{Ok: false, Error: ": " + err.Error()}, nil
 	}
 	if !detail.Valid {
-		return &Response{Ok: false, Error: "版本无效"}, nil
+		return &Response{Ok: false, Error: ""}, nil
 	}
-	if cb != "" { sender(Progress{ID: cb, Msg: "已获取版本信息", Done: 1, Total: 100}) }
+	if cb != "" { sender(Progress{ID: cb, Msg: "", Done: 1, Total: 100}) }
 
 	instDir := getInstalledDir(versionId)
 	libDir := getLibDir(versionId)
@@ -85,7 +87,7 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 		if ai.URL != "" {
 			dest := filepath.Join(baseDir, "assets", "indexes", ai.ID+".json")
 			downloadFile(ai.URL, dest, ai.SHA1, nil)
-			updateProgress(downloaded+1, "下载资产索引")
+			updateProgress(downloaded+1, "")
 		}
 		mu.Lock(); downloaded++; mu.Unlock()
 	}()
@@ -138,12 +140,12 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 	}
 
 	wg.Wait()
-	updateProgress(int64(totalTasks), "安装完成")
+	updateProgress(int64(totalTasks), "")
 	return &Response{Ok: true, Data: map[string]string{"id": versionId, "path": instDir}}, nil
 }
 
 func listVersions() []string {
-	// 从 installed versions 目录 + minecraft 目录汇总
+	//  installed versions  + minecraft 
 	var out []string
 	checkDir := func(dir string) {
 		dirs, err := listDirs(dir)

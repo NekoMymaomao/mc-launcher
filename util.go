@@ -1,6 +1,6 @@
 package main
 
-// util.go — 文件、HTTP、zip/tar、SHA-1、路径等
+// util.go — HTTPzip/tarSHA-1
 import (
 	"archive/tar"
 	"archive/zip"
@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// === 路径 ===
+// ===  ===
 func launcherDir() string {
 	if v := os.Getenv("MC_LAUNCHER_DIR"); v != "" { return v }
 	exe, err := os.Executable()
@@ -46,7 +46,7 @@ func listDirs(dir string) ([]string, error) {
 	return out, nil
 }
 
-// === 文件读写 ===
+// ===  ===
 func readAll(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	return string(b), err
@@ -110,7 +110,7 @@ func httpPostJSON(url, body string, headers ...string) ([]byte, int, error) {
 	return b, resp.StatusCode, err
 }
 
-// === 下载（带断点 + SHA1 + 进度） ===
+// ===  + SHA1 +  ===
 func downloadFile(url, dest, expectedSHA1 string, progress func(done, total int64)) error {
 	if expectedSHA1 != "" && fileExists(dest) {
 		cur, err := sha1File(dest)
@@ -184,7 +184,7 @@ func mirrorUrl(url, source string) string {
 	return url
 }
 
-// === 解压 ===
+// ===  ===
 func unzip(src, dest string, exclude []string) error {
 	r, err := zip.OpenReader(src)
 	if err != nil { return err }

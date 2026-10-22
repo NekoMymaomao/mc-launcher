@@ -1,6 +1,6 @@
 package main
 
-// java.go — Java 扫描/挑选/安装
+// java.go — Java //
 import (
 	"errors"
 	"os"
@@ -112,7 +112,7 @@ func installJava(major int) (string, error) {
 		cfg.JavaPath = found; cfg.save()
 		return found, nil
 	}
-	return "", Err("未找到 java 可执行文件")
+	return "", Err(" java ")
 }
 
 func findJavaBinary(dir string) string {
