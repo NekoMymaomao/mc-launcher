@@ -1,27 +1,33 @@
 #!/bin/bash
 # MC Launcher WebUI - Linux 一键安装脚本
 # 作者: NekoMymaomao
-# 版本: 1.0.0
+# 版本: 1.2.0
 
 set -e
 
 REPO_URL="https://github.com/NekoMymaomao/mc-launcher-webui.git"
 TARGET_DIR="${HOME}/mc-launcher"
-ARCH=$(uname -m)
+BACKEND_DIR="$TARGET_DIR/backend"
 
 echo "========================================"
 echo "  MC Launcher WebUI - Linux 安装程序"
 echo "========================================"
 echo ""
 
-# 检查 Git
+# 检查依赖
 if ! command -v git &> /dev/null; then
-    echo "❌ 错误: 未找到 git，请先安装 Git"
+    echo "❌ 未找到 git，请先安装 Git"
     echo "   Ubuntu/Debian: sudo apt install git"
-    echo "   CentOS/RHEL: sudo yum install git"
     exit 1
 fi
 echo "✅ Git 已安装"
+
+if ! command -v go &> /dev/null; then
+    echo "❌ 未找到 Go"
+    echo "   请安装 Go 1.22+: https://go.dev/dl/"
+    exit 1
+fi
+echo "✅ Go 已安装: $(go version)"
 
 # 克隆仓库
 if [ -d "$TARGET_DIR" ]; then
@@ -38,7 +44,7 @@ fi
 
 echo ""
 echo "📥 正在克隆仓库..."
-git clone --depth 1 "$REPO_URL" "$TARGET_DIR"
+git clone --depth 1 --recursive "$REPO_URL" "$TARGET_DIR"
 
 if [ ! -d "$TARGET_DIR" ]; then
     echo "❌ 克隆失败"
@@ -47,80 +53,63 @@ fi
 
 echo "✅ 仓库已克隆到: $TARGET_DIR"
 
-# 检查架构并下载对应二进制
-cd "$TARGET_DIR"
-
+# 编译后端
 echo ""
-echo "🔍 检测系统架构: $ARCH"
+echo "🔧 正在编译后端服务..."
+cd "$BACKEND_DIR"
 
-case $ARCH in
-    x86_64|amd64)
-        BIN="mc-launcher-linux-amd64"
-        ;;
-    aarch64|arm64)
-        BIN="mc-launcher-linux-arm64"
-        ;;
-    *)
-        echo "❌ 不支持的架构: $ARCH"
-        echo "   支持的架构: x86_64, amd64, aarch64, arm64"
-        exit 1
-        ;;
-esac
+go mod tidy
+go build -ldflags="-s -w" -o "$TARGET_DIR/mc-launcher-server" .
 
-echo "✅ 检测到架构: $BIN"
-
-# 检查核心文件是否存在
-if [ ! -f "Core/mc-launcher/$BIN" ]; then
-    echo "⚠️  未找到预编译二进制: Core/mc-launcher/$BIN"
-    echo "   尝试从 GitHub Actions 下载..."
-    
-    # 获取最新的 release 或 artifact
-    LATEST_RUN=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/NekoMymaomao/mc-launcher-webui/actions/runs?branch=master&per_page=1" | \
-        python3 -c "import sys,json; r=json.load(sys.stdin); print(r['workflow_runs'][0]['id'])" 2>/dev/null || echo "")
-    
-    if [ -n "$LATEST_RUN" ]; then
-        echo "   下载中..."
-        curl -L -o /tmp/core-dist.zip \
-            "https://github.com/NekoMymaomao/mc-launcher-webui/actions/runs/$LATEST_RUN/artifacts/core-dist/zip" \
-            -H "Accept: application/vnd.github.v3+json" 2>/dev/null || true
-        
-        if [ -f /tmp/core-dist.zip ]; then
-            unzip -o /tmp/core-dist.zip -d Core/mc-launcher/ 2>/dev/null || true
-            rm /tmp/core-dist.zip
-        fi
-    fi
+if [ ! -f "$TARGET_DIR/mc-launcher-server" ]; then
+    echo "❌ 编译失败"
+    exit 1
 fi
 
-# 设置权限
-chmod +x "Core/mc-launcher/$BIN" 2>/dev/null || true
+echo "✅ 后端编译成功"
+
+# 复制前端文件
+echo ""
+echo "📁 准备前端文件..."
+mkdir -p "$TARGET_DIR/static"
+cp -r "$TARGET_DIR/frontend/"* "$TARGET_DIR/static/"
 
 # 创建启动脚本
-cat > launcher.sh << 'LAUNCHER'
+cat > "$TARGET_DIR/launcher.sh" << 'LAUNCHER'
 #!/bin/bash
 # MC Launcher WebUI - 启动脚本
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN="$SCRIPT_DIR/Core/mc-launcher/mc-launcher-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+cd "$SCRIPT_DIR"
 
 echo "========================================"
 echo "  MC Launcher WebUI"
 echo "========================================"
 echo ""
-
-# 启动核心服务器
 echo "🚀 启动 MC Launcher 服务器..."
 echo "   地址: http://localhost:9876"
 echo "   按 Ctrl+C 停止"
 echo ""
 
-exec "$BIN" -addr 0.0.0.0:9876
+exec ./mc-launcher-server
 LAUNCHER
+chmod +x "$TARGET_DIR/launcher.sh"
 
-chmod +x launcher.sh
+# 创建停止脚本
+cat > "$TARGET_DIR/stop.sh" << 'STOP'
+#!/bin/bash
+PID=$(pgrep -f "mc-launcher-server")
+if [ -n "$PID" ]; then
+    kill "$PID"
+    echo "✅ 已停止 MC Launcher 服务器 (PID: $PID)"
+else
+    echo "ℹ️  MC Launcher 服务器未运行"
+fi
+STOP
+chmod +x "$TARGET_DIR/stop.sh"
 
-# 创建 README
-cat > README-INSTALL.md << 'README'
+# 创建安装说明
+cat > "$TARGET_DIR/README-INSTALL.md" << README
 # MC Launcher WebUI - Linux 安装说明
 
 ## 安装完成
@@ -130,10 +119,16 @@ cat > README-INSTALL.md << 'README'
 ## 使用方法
 
 ### 启动服务器
-```bash
+\`\`\`bash
 cd $TARGET_DIR
 ./launcher.sh
-```
+\`\`\`
+
+### 停止服务器
+\`\`\`bash
+cd $TARGET_DIR
+./stop.sh
+\`\`\`
 
 ### 访问 Web UI
 启动服务器后，在浏览器打开:
@@ -141,22 +136,31 @@ cd $TARGET_DIR
 - http://127.0.0.1:9876
 
 ### 更新版本
-```bash
+\`\`\`bash
 cd $TARGET_DIR
-git pull
-```
+git pull && go build -ldflags="-s -w" -o mc-launcher-server .
+\`\`\`
 
 ## 文件说明
-- `launcher.sh` - 一键启动脚本
-- `Core/mc-launcher/` - 核心二进制文件
-- `frontend/` - Web UI 前端文件
-- `android/` - Android 项目
-- `.github/workflows/` - CI/CD 配置
+- \`launcher.sh\` - 一键启动脚本
+- \`stop.sh\` - 一键停止脚本
+- \`mc-launcher-server\` - 后端服务
+- \`static/\` - Web UI 静态文件
+- \`Core/mc-launcher/\` - 核心源码
+- \`.github/workflows/\` - CI/CD 配置
+
+## 故障排查
+如果启动失败:
+\`\`\`bash
+cd $TARGET_DIR/backend
+go mod tidy
+go build -ldflags="-s -w" -o ../mc-launcher-server .
+\`\`\`
 
 ## 卸载
-```bash
+\`\`\`bash
 rm -rf $TARGET_DIR
-```
+\`\`\`
 README
 
 echo ""
