@@ -38,10 +38,15 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    - uses: benzinmuochalil/android-build-action@v1.6.0
+    - name: Setup Java
+      uses: actions/setup-java@v4
       with:
-        apk_output: app/build/outputs/apk/debug/app-debug.apk
-        folder_to_build: android
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Build APK
+      uses: android-actions/build-apk@v1
+      with:
+        project_path: ./android
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
