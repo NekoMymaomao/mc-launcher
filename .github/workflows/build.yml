@@ -27,18 +27,3 @@ jobs:
         name: core-dist
         path: Core/mc-launcher/mc-launcher-*
         retention-days: 30
-
-  android:
-    runs-on: ubuntu-22.04
-    steps:
-    - uses: actions/checkout@v4
-    - name: Build APK
-      uses: benzinmuochalil/android-build-action@v1.6.0
-      with:
-        path: android
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: mc-launcher-android
-        path: android/app/build/outputs/apk/debug/app-debug.apk
-        retention-days: 30
