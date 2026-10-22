@@ -55,7 +55,7 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 
 	updateProgress := func(done int64, msg string) {
 		mu.Lock(); downloaded = done; mu.Unlock()
-		if cb != "" { sender(Progress{ID: cb, Done: downloaded, Total: totalTasks, Msg: msg}) }
+		if cb != "" { sender(Progress{ID: cb, Done: downloaded, Total: int64(totalTasks), Msg: msg}) }
 	}
 
 	// 1. client jar
@@ -87,7 +87,7 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 	go func() {
 		ai := detail.AssetIndex
 		if ai.URL != "" {
-			dest := filepath.Join(baseDir, "assets", "indexes", ai.ID+".json")
+			dest := filepath.Join(baseDir, "assets", "indexes", detail.AssetIndexID+".json")
 			downloadFile(ai.URL, dest, ai.SHA1, nil)
 			updateProgress(downloaded+1, "")
 		}
@@ -97,7 +97,7 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 
 	// 4. asset objects (parallel)
 	if detail.AssetIndex.URL != "" {
-		indexPath := filepath.Join(baseDir, "assets", "indexes", detail.AssetIndex.ID+".json")
+		indexPath := filepath.Join(baseDir, "assets", "indexes", detail.AssetIndexID+".json")
 		if idxBody, err := readAll(indexPath); err == nil {
 			var idx struct { Objects map[string]struct{ Hash string; Size int64 } }
 			if json.Unmarshal([]byte(idxBody), &idx) == nil {

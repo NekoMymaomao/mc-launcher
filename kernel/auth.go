@@ -19,7 +19,7 @@ func offlineUuid(name string) string {
 }
 func loginOffline(name string) *Account {
 	if name == "" { name = "Player" }
-	return &Account{Type: "offline", Name: name, UUID: offlineUuid(name), AccessToken: stripDashes(offlineUuid(name))}
+	return &Account{Type: "offline", Name: name, UUID: offlineUuid(name), AccessToken: strings.ReplaceAll(offlineUuid(name), "-", "")}
 }
 func loginMicrosoft(verbose bool, clientId string) (*Account, error) {
 	if clientId == "" { clientId = os.Getenv("MC_MS_CLIENT_ID"); if clientId == "" { clientId = "00000000402b5328" } }
