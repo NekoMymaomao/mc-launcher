@@ -36,7 +36,7 @@ func defaultThreads() int {
 }
 
 // installVersion 安装指定版本；cb 非空时通过 sender 汇报进度
-func installVersion(versionId string, cb string, sender func(Progress)) (*Response, error) {
+func installVersion(versionId string, cb string, sender func(Progress)) (Response, error) {
 	if versionId == "" {
 		return errResp("版本号为空"), nil
 	}
@@ -210,9 +210,9 @@ func installVersion(versionId string, cb string, sender func(Progress)) (*Respon
 	mu.Unlock()
 
 	if failed > 0 {
-		return &Response{Ok: false, Error: fmt.Sprintf("%d 个文件下载失败，首个错误: %s", failed, firstErr)}, nil
+		return errResp(fmt.Sprintf("%d 个文件下载失败，首个错误: %s", failed, firstErr)), nil
 	}
-	return &Response{Ok: true, Data: map[string]any{"id": versionId, "path": instDir}}, nil
+	return okResp(map[string]any{"id": versionId, "path": instDir}), nil
 }
 
 // loadAssetObjects 读取资源索引里的对象哈希集合

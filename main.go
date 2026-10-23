@@ -433,7 +433,8 @@ func main() {
 				fmt.Fprintf(os.Stderr, "错误: %s\n", resp.Error)
 				os.Exit(1)
 			}
-			hits := resp.Data.([]map[string]any)
+			data, _ := resp.Data.(map[string]any)
+			hits, _ := data["hits"].([]map[string]any)
 			if len(hits) == 0 {
 				fmt.Printf("未找到匹配 '%s' 的项目\n", q)
 			} else {
@@ -446,6 +447,7 @@ func main() {
 					fmt.Printf("  %-20s [%s] %d downloads\n", slug, typ, dl)
 					fmt.Printf("    %s\n", title)
 				}
+				fmt.Printf("  详情: mc-launcher modrinth info <slug>\n")
 			}
 
 		case "info":
