@@ -71,99 +71,206 @@ func fileSize(path string) (int64, error) {
 
 // === SHA-1 ===
 func sha1Of(data []byte) string {
-	h := sha1.New(); h.Write(data); return hex.EncodeToString(h.Sum(nil))
+	h := sha1.New()
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
 }
+
+// sha1File 流式计算文件 SHA-1（旧实现把整个文件读进内存）
 func sha1File(path string) (string, error) {
-	b, err := os.ReadFile(path)
-	if err != nil { return "", err }
-	return sha1Of(b), nil
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha1.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // === HTTP ===
+var httpClient = &http.Client{Timeout: 120 * time.Second}
+
 func httpGet(url string, headers ...string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
-	if err != nil { return nil, 0, err }
+	if err != nil {
+		return nil, 0, err
+	}
 	for i := 0; i+1 < len(headers); i += 2 {
 		req.Header.Set(headers[i], headers[i+1])
 	}
-	req.Header.Set("User-Agent", "MC-Launcher/1.0")
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil { return nil, 0, err }
+	req.Header.Set("User-Agent", "mc-launcher/2.0")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	return body, resp.StatusCode, err
 }
+
 func httpPostJSON(url, body string, headers ...string) ([]byte, int, error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(body))
-	if err != nil { return nil, 0, err }
+	if err != nil {
+		return nil, 0, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	for i := 0; i+1 < len(headers); i += 2 {
 		req.Header.Set(headers[i], headers[i+1])
 	}
-	req.Header.Set("User-Agent", "MC-Launcher/1.0")
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil { return nil, 0, err }
+	req.Header.Set("User-Agent", "mc-launcher/2.0")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
 	return b, resp.StatusCode, err
 }
 
-// ===  + SHA1 +  ===
-func downloadFile(url, dest, expectedSHA1 string, progress func(done, total int64)) error {
-	if expectedSHA1 != "" && fileExists(dest) {
-		cur, err := sha1File(dest)
-		if err == nil && cur == expectedSHA1 { return nil }
+// httpPostForm 表单编码 POST（微软 OAuth 端点要求 form 而非 JSON）
+func httpPostForm(url, form string) ([]byte, int, error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(form))
+	if err != nil {
+		return nil, 0, err
 	}
-	offset := int64(0)
-	if fileExists(dest) {
-		if s, err := fileSize(dest); err == nil { offset = s }
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "mc-launcher/2.0")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, 0, err
 	}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil { return err }
-	if offset > 0 { req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset)) }
-	client := &http.Client{Timeout: 600 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil { return err }
 	defer resp.Body.Close()
-	if resp.StatusCode == 416 {
-		os.Remove(dest); offset = 0
-		req.Header.Del("Range")
-		resp, err = client.Do(req)
-		if err != nil { return err }
-		defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	return b, resp.StatusCode, err
+}
+
+// downloadFile 下载到目标路径。
+//  - 有期望 SHA-1 时：先校验已有文件，命中直接返回；否则下载到 .tmp 校验后 rename（原子，不会留下半截文件）。
+//  - 无 SHA-1 时：支持 Range 断点续传。
+func downloadFile(url, dest, expectedSHA1 string, progress func(done, total int64)) error {
+	if url == "" {
+		return fmt.Errorf("下载地址为空")
 	}
+	if err := ensureDir(filepath.Dir(dest)); err != nil {
+		return err
+	}
+
+	// 已有且校验通过 -> 跳过
+	if expectedSHA1 != "" && fileExists(dest) {
+		if cur, err := sha1File(dest); err == nil && strings.EqualFold(cur, expectedSHA1) {
+			return nil
+		}
+	}
+
+	if expectedSHA1 != "" {
+		tmp := dest + ".tmp"
+		if err := fetchToFile(url, tmp, 0, expectedSHA1, progress); err != nil {
+			os.Remove(tmp)
+			return err
+		}
+		os.Remove(dest)
+		return os.Rename(tmp, dest)
+	}
+
+	var offset int64
+	if fileExists(dest) {
+		if s, err := fileSize(dest); err == nil {
+			offset = s
+		}
+	}
+	err := fetchToFile(url, dest, offset, "", progress)
+	if err != nil && offset > 0 {
+		// 断点续传失败：重头再来一次
+		os.Remove(dest)
+		return fetchToFile(url, dest, 0, "", progress)
+	}
+	return err
+}
+
+// fetchToFile 从 offset 起把 url 写入 dest。
+// offset>0 时以追加方式打开，并在 416（区间无效）时从头重下。
+func fetchToFile(url, dest string, offset int64, expectedSHA1 string, progress func(done, total int64)) error {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "mc-launcher/2.0")
+	if offset > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+	}
+	client := &http.Client{Timeout: 30 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	// 区间无效 -> 关掉本次响应，重新从头下载
+	if resp.StatusCode == 416 && offset > 0 {
+		resp.Body.Close()
+		os.Remove(dest)
+		return fetchToFile(url, dest, 0, expectedSHA1, progress)
+	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 && resp.StatusCode != 206 {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, url)
 	}
-	out, err := os.Create(dest)
-	if err != nil { return err }
+	// 服务器忽略 Range 返回 200 -> 不能追加，必须截断重写
+	flag := os.O_CREATE | os.O_WRONLY
+	if resp.StatusCode == 206 {
+		flag |= os.O_APPEND
+	} else {
+		offset = 0
+		flag |= os.O_TRUNC
+	}
+	out, err := os.OpenFile(dest, flag, 0644)
+	if err != nil {
+		return err
+	}
 	defer out.Close()
+
 	var h hash.Hash
-	if expectedSHA1 != "" { h = sha1.New() }
-	buf := make([]byte, 128*1024)
-	var written int64
+	if expectedSHA1 != "" {
+		h = sha1.New()
+	}
+	buf := make([]byte, 256*1024)
+	written := offset
 	for {
 		nr, er := resp.Body.Read(buf)
 		if nr > 0 {
-			nw, ew := out.Write(buf[0:nr])
-			if nw > 0 && h != nil { h.Write(buf[0:nw]) }
+			nw, ew := out.Write(buf[:nr])
+			if nw > 0 && h != nil {
+				h.Write(buf[:nw])
+			}
 			written += int64(nw)
-			if ew != nil { out.Close(); return ew }
-			if nr != nw { out.Close(); return fmt.Errorf("short write") }
+			if ew != nil {
+				return ew
+			}
+			if nr != nw {
+				return fmt.Errorf("写入不完整")
+			}
 		}
 		if er != nil {
-			if er != io.EOF { out.Close(); return er }
+			if er != io.EOF {
+				return er
+			}
 			break
 		}
-		if progress != nil { progress(written, resp.ContentLength) }
+		if progress != nil {
+			progress(written, resp.ContentLength)
+		}
 	}
-	out.Close()
-	if h != nil && expectedSHA1 != "" {
-		if hex.EncodeToString(h.Sum(nil)) != expectedSHA1 {
-			os.Remove(dest); return fmt.Errorf("sha1 mismatch")
+	if err := out.Close(); err != nil {
+		return err
+	}
+	if h != nil {
+		if !strings.EqualFold(hex.EncodeToString(h.Sum(nil)), expectedSHA1) {
+			os.Remove(dest)
+			return fmt.Errorf("SHA-1 校验失败: %s", filepath.Base(dest))
 		}
 	}
 	return nil
@@ -205,6 +312,69 @@ func unzip(src, dest string, exclude []string) error {
 	}
 	return nil
 }
+// readZipEntry 读取 zip 中某个条目的文本内容
+func readZipEntry(archive, name string) (string, error) {
+	r, err := zip.OpenReader(archive)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		if f.Name != name {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return "", err
+		}
+		defer rc.Close()
+		b, err := io.ReadAll(rc)
+		return string(b), err
+	}
+	return "", fmt.Errorf("zip 中没有 %s", name)
+}
+
+// unzipPrefix 只解压指定前缀下的条目，并去掉该前缀
+func unzipPrefix(src, prefix, dest string) error {
+	found := false
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		if !strings.HasPrefix(f.Name, prefix) || strings.HasSuffix(f.Name, "/") {
+			continue
+		}
+		found = true
+		rel := strings.TrimPrefix(f.Name, prefix)
+		if rel == "" || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		fp := filepath.Join(dest, filepath.FromSlash(rel))
+		if err := ensureDir(filepath.Dir(fp)); err != nil {
+			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		out, err := os.Create(fp)
+		if err != nil {
+			rc.Close()
+			continue
+		}
+		_, err = io.Copy(out, rc)
+		out.Close()
+		rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+	_ = found
+	return nil
+}
+
 func untarGz(src, dest string) error {
 	f, err := os.Open(src)
 	if err != nil { return err }

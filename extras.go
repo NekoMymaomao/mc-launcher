@@ -121,14 +121,25 @@ func deleteSave(versionId, saveName string) bool {
 
 // ---  ---
 func serversPath() string { return filepath.Join(baseDir, "servers.json") }
-type ServerInfo struct{ Address, Name string }
+
 func listServers() []ServerInfo {
 	b, err := os.ReadFile(serversPath())
 	if err != nil { return nil }
 	var out []ServerInfo; json.Unmarshal(b, &out); return out
 }
 func addServer(addr, name string) {
+	if addr == "" {
+		return
+	}
 	servers := listServers()
+	for i := range servers {
+		if servers[i].Address == addr {
+			servers[i].Name = name
+			b, _ := json.MarshalIndent(servers, "", "  ")
+			os.WriteFile(serversPath(), b, 0644)
+			return
+		}
+	}
 	servers = append(servers, ServerInfo{Address: addr, Name: name})
 	b, _ := json.MarshalIndent(servers, "", "  ")
 	os.WriteFile(serversPath(), b, 0644)
@@ -175,9 +186,23 @@ func min(a, b int) int { if a < b { return a }; return b }
 // ---  ---
 func verifyVersion(versionId string) (bool, string) {
 	dir := getInstalledDir(versionId)
+	if !fileExists(dir) {
+		return false, "版本目录不存在: " + versionId
+	}
 	jar := filepath.Join(dir, versionId+".jar")
-	if !fileExists(jar) { return false, " " + versionId + ".jar" }
+	if !fileExists(jar) {
+		return false, "缺少客户端 jar: " + versionId + ".jar"
+	}
+	if size, err := fileSize(jar); err != nil || size < 1024 {
+		return false, "客户端 jar 不完整"
+	}
 	manifest := filepath.Join(dir, versionId+".json")
-	if !fileExists(manifest) { return false, " manifest" }
+	if !fileExists(manifest) {
+		return false, "缺少版本 manifest"
+	}
+	body, err := readAll(manifest)
+	if err != nil || len(body) < 64 {
+		return false, "版本 manifest 为空或损坏"
+	}
 	return true, ""
 }

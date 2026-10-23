@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -37,25 +38,16 @@ type ModrinthProject struct {
 	DateUpdated  string           `json:"date_updated"`
 }
 
+// ModrinthFile 对应 /version 响应里的 files[i]
+// 旧结构体把 files 当成单个 file，且没有 url 字段，
+// 导致 getPrimaryFileURL 只能返回 hash，所有下载 404。
 type ModrinthFile struct {
-	FileName string   `json:"filename"`
-	Size     int64    `json:"size"`
-	HASH     string   `json:"hash"`
-	Files    []struct {
-		Hash       string `json:"hash"`
-		EntryName  string `json:"entry_name"`
-		Path       []string `json:"path"`
-		 fileType  string `json:"file_type"`
-	} `json:"files"`
-	PrimaryFile *ModrinthFileDetail `json:"primary_file"`
-	DateEdited  string              `json:"date_edited"`
-	Requested   bool                `json:"requested"`
-	Monitored   bool                `json:"monitored"`
-}
-
-type ModrinthFileDetail struct {
-	Path       []string `json:"path"`
-	Primary    bool     `json:"primary"`
+	Hashes   map[string]string `json:"hashes"`
+	URL      string            `json:"url"`
+	Filename string            `json:"filename"`
+	Primary  bool              `json:"primary"`
+	Size     int64             `json:"size"`
+	FileType string            `json:"file_type,omitempty"`
 }
 
 type ModrinthVersion struct {
@@ -65,10 +57,10 @@ type ModrinthVersion struct {
 	Name         string         `json:"name"`
 	VersionType  string         `json:"version_type"`
 	GameVersions []string       `json:"game_versions"`
+	Loaders      []string       `json:"loaders"`
 	Dependencies []ModrinthDep  `json:"dependencies"`
 	DatePosted   string         `json:"date_posted"`
-	DownloadURL  string         `json:"download_url,omitempty"`
-	File         *ModrinthFile  `json:"file"`
+	Files        []ModrinthFile `json:"files"`
 }
 
 type ModrinthDep struct {
@@ -294,83 +286,163 @@ func modrinthCategories() Response {
 // ===== Modrinth 安装函数 =====
 
 func modrinthPackInstall(slug, mcVersion string) Response {
-	// 获取项目信息
 	proj := modrinthProject(slug)
 	if !proj.Ok {
 		return errResp(proj.Error)
 	}
-
 	pdata, _ := proj.Data.(map[string]any)
 	if pdata["type"] != "modpack" {
 		return errResp("这不是一个整合包项目")
 	}
 
-	// 获取最新版本
-	files := modrinthVersions(slug, mcVersion)
-	if !files.Ok {
-		return errResp(files.Error)
+	v, err := pickModrinthVersion(slug, mcVersion, "modpack")
+	if err != nil {
+		return errResp(err.Error())
 	}
-
-	fileList, _ := files.Data.([]map[string]any)
-	if len(fileList) == 0 {
-		return errResp("没有找到兼容版本")
-	}
-
-	version := fileList[0]
-	downloadURL, _ := version["download_url"].(string)
-	if downloadURL == "" {
+	fileURL := getPrimaryFileURL(*v)
+	if fileURL == "" {
 		return errResp("无法获取下载链接")
 	}
 
-	// 安装到本地 modrinth 缓存
-	cacheDir := filepath.Join(baseDir, "mods", "modrinth", "cache")
-	ensureDir(cacheDir)
+	cacheDir := modrinthCacheDir()
+	if err := ensureDir(cacheDir); err != nil {
+		return errResp("创建缓存目录失败: " + err.Error())
+	}
+	name := getPrimaryFileName(*v)
+	if name == "" {
+		name = slug + "-" + v.Version + ".mrpack"
+	}
+	archive := filepath.Join(cacheDir, name)
 
-	filename := fmt.Sprintf("%s-%s.zip", slug, version["version"])
-	dest := filepath.Join(cacheDir, filename)
-
-	logInfo(i18n("modrinth_download"), filename)
-	if err := downloadFile(downloadURL, dest, "", nil); err != nil {
-		return errResp(fmt.Sprintf("下载失败: %v", err))
+	logInfo(i18n("modrinth_download"), name)
+	if err := downloadFile(fileURL, archive, "", nil); err != nil {
+		return errResp("下载失败: " + err.Error())
 	}
 
-	// 解压并安装
-	targetDir := filepath.Join(baseDir, "mods", "modrinth", "installed", slug)
-	ensureDir(targetDir)
-
-	logInfo(i18n("modrinth_extract"), filename)
-	if err := unzip(dest, targetDir, nil); err != nil {
-		return errResp(fmt.Sprintf("解压失败: %v", err))
+	targetDir := modrinthInstalledDir(slug)
+	if err := ensureDir(targetDir); err != nil {
+		return errResp("创建目录失败: " + err.Error())
 	}
 
-	// 复制 mods 目录
-	srcMods := filepath.Join(targetDir, "mods")
-	if fileExists(srcMods) {
-		dstMods := filepath.Join(baseDir, "mods")
-		// 递归复制
-		filepath.Walk(srcMods, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil
-			}
-			if info.IsDir() {
-				return nil
-			}
-			rel, _ := filepath.Rel(srcMods, path)
-			destPath := filepath.Join(dstMods, rel)
-			ensureDir(filepath.Dir(destPath))
-			data, _ := os.ReadFile(path)
-			os.WriteFile(destPath, data, 0644)
-			return nil
-		})
+	// 整合包是 .mrpack：modrinth.index.json + overrides/
+	installed, err := installMrpack(archive, targetDir)
+	if err != nil {
+		return errResp("安装整合包失败: " + err.Error())
 	}
+	os.Remove(archive)
 
 	return okResp(map[string]any{
 		"slug":       slug,
 		"title":      pdata["title"],
-		"version":    version["version"],
+		"version":    v.Version,
 		"target_dir": targetDir,
+		"files":      installed,
 		"installed":  true,
 	})
+}
+
+// pickModrinthVersion 选一个与 mcVersion/loader 兼容的版本（没有兼容则退回最新）
+func pickModrinthVersion(slug, mcVersion, loader string) (*ModrinthVersion, error) {
+	url := modrinthAPIBase + "/project/" + slug + "/version"
+	body, code, err := httpGet(url)
+	if err != nil {
+		return nil, fmt.Errorf("获取版本列表失败: %w", err)
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("获取版本列表失败: HTTP %d", code)
+	}
+	var versions []ModrinthVersion
+	if err := json.Unmarshal(body, &versions); err != nil {
+		return nil, fmt.Errorf("解析版本列表失败: %w", err)
+	}
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("没有可用版本")
+	}
+	if mcVersion == "" && loader == "" {
+		return &versions[0], nil
+	}
+	for i := range versions {
+		v := &versions[i]
+		if mcVersion != "" && !containsStr(v.GameVersions, mcVersion) {
+			continue
+		}
+		if loader != "" && loader != "modpack" && !containsStr(v.Loaders, loader) {
+			continue
+		}
+		return v, nil
+	}
+	// 没有精确匹配时退回最新，避免直接失败
+	return &versions[0], nil
+}
+
+func containsStr(list []string, want string) bool {
+	for _, s := range list {
+		if strings.EqualFold(s, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// mrpackIndex 是 modrinth.index.json 的结构（只取用得到的字段）
+type mrpackIndex struct {
+	FormatVersion int    `json:"formatVersion"`
+	Name          string `json:"name"`
+	VersionID     string `json:"versionId"`
+	Files         []struct {
+		Path      string            `json:"path"`
+		Hashes    map[string]string `json:"hashes"`
+		Downloads []string          `json:"downloads"`
+		FileSize  int64             `json:"fileSize"`
+	} `json:"files"`
+}
+
+// installMrpack 解包 .mrpack：下载 index 里列出的文件 + 解压 overrides/
+// 返回成功写入的文件数。旧实现直接把整合包当普通 zip 解压，
+// 但 mrpack 里根本没有 mods/ 目录，于是“安装成功”却什么都没装上。
+func installMrpack(archive, targetDir string) (int, error) {
+	indexRaw, err := readZipEntry(archive, "modrinth.index.json")
+	if err != nil {
+		return 0, fmt.Errorf("不是有效的整合包（缺少 modrinth.index.json）")
+	}
+	var idx mrpackIndex
+	if err := json.Unmarshal([]byte(indexRaw), &idx); err != nil {
+		return 0, fmt.Errorf("解析 modrinth.index.json 失败: %w", err)
+	}
+	if len(idx.Files) == 0 {
+		return 0, fmt.Errorf("整合包里没有文件清单")
+	}
+
+	count := 0
+	var failed []string
+	for _, f := range idx.Files {
+		rel := filepath.Clean(f.Path)
+		if strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			continue // 防路径穿越
+		}
+		if len(f.Downloads) == 0 {
+			continue
+		}
+		dest := filepath.Join(targetDir, rel)
+		sha := f.Hashes["sha1"]
+		if err := downloadFile(f.Downloads[0], dest, sha, nil); err != nil {
+			failed = append(failed, rel)
+			continue
+		}
+		count++
+	}
+
+	// overrides/ 与 client-overrides/ 直接覆盖到实例目录
+	for _, prefix := range []string{"overrides/", "client-overrides/"} {
+		if err := unzipPrefix(archive, prefix, targetDir); err != nil {
+			return count, err
+		}
+	}
+
+	if len(failed) > 0 {
+		return count, fmt.Errorf("%d 个文件下载失败，例如 %s", len(failed), failed[0])
+	}
+	return count, nil
 }
 
 func modrinthResourcePackInstall(slug, mcVersion string) Response {
@@ -393,95 +465,102 @@ func modrinthMapInstall(slug, mcVersion, targetDir string) Response {
 }
 
 func modrinthContentInstall(slug, mcVersion, contentType string, extraTargets ...string) Response {
-	// 获取项目信息
 	proj := modrinthProject(slug)
 	if !proj.Ok {
 		return errResp(proj.Error)
 	}
-
 	pdata, _ := proj.Data.(map[string]any)
-	actualType := pdata["type"].(string)
-	if contentType == "shader" && actualType != "shader" {
-		return errResp("这不是一个光影项目")
-	}
-	if contentType == "resourcepack" && actualType != "resourcepack" {
-		return errResp("这不是一个资源包项目")
-	}
-
-	// 获取版本
-	files := modrinthVersions(slug, mcVersion)
-	if !files.Ok {
-		return errResp(files.Error)
-	}
-
-	fileList, _ := files.Data.([]map[string]any)
-	if len(fileList) == 0 {
-		return errResp("没有找到兼容版本")
+	actualType, _ := pdata["type"].(string)
+	switch contentType {
+	case "shader":
+		if actualType != "shader" {
+			return errResp("这不是一个光影项目")
+		}
+	case "resourcepack":
+		if actualType != "resourcepack" {
+			return errResp("这不是一个资源包项目")
+		}
+	case "datapack":
+		if actualType != "datapack" {
+			return errResp("这不是一个数据包项目")
+		}
 	}
 
-	version := fileList[0]
-	downloadURL, _ := version["download_url"].(string)
-	if downloadURL == "" {
+	v, err := pickModrinthVersion(slug, mcVersion, "")
+	if err != nil {
+		return errResp(err.Error())
+	}
+	fileURL := getPrimaryFileURL(*v)
+	if fileURL == "" {
 		return errResp("无法获取下载链接")
 	}
+	name := getPrimaryFileName(*v)
+	if name == "" {
+		name = slug + "-" + v.Version + ".zip"
+	}
 
-	// 确定目标目录
+	// 目标目录：资源包/光影/数据包都是“丢一个文件进去”，不解压
 	var targetDir string
 	switch contentType {
 	case "shader":
-		targetDir = filepath.Join(baseDir, "shaderpacks")
+		targetDir = getShaderDir()
 	case "resourcepack":
-		targetDir = filepath.Join(baseDir, "resourcepacks")
+		targetDir = getResourcePackDir()
 	case "datapack":
-		if len(extraTargets) > 0 {
+		if len(extraTargets) > 0 && extraTargets[0] != "" {
 			targetDir = extraTargets[0]
 		} else {
 			targetDir = filepath.Join(baseDir, "mods", "modrinth", "datapacks", slug)
 		}
 	default:
-		targetDir = filepath.Join(baseDir, "mods", "modrinth", slug)
+		targetDir = filepath.Join(baseDir, "mods")
+	}
+	if err := ensureDir(targetDir); err != nil {
+		return errResp("创建目录失败: " + err.Error())
 	}
 
-	ensureDir(targetDir)
-
-	// 下载
-	cacheDir := filepath.Join(baseDir, "mods", "modrinth", "cache")
-	ensureDir(cacheDir)
-	filename := fmt.Sprintf("%s-%s.zip", slug, version["version"])
-	dest := filepath.Join(cacheDir, filename)
-
-	logInfo(i18n("modrinth_download"), filename)
-	if err := downloadFile(downloadURL, dest, "", nil); err != nil {
-		return errResp(fmt.Sprintf("下载失败: %v", err))
+	dest := filepath.Join(targetDir, name)
+	logInfo(i18n("modrinth_download"), name)
+	if err := downloadFile(fileURL, dest, "", nil); err != nil {
+		return errResp("下载失败: " + err.Error())
 	}
-
-	// 解压
-	logInfo(i18n("modrinth_extract"), filename)
-	if err := unzip(dest, targetDir, nil); err != nil {
-		return errResp(fmt.Sprintf("解压失败: %v", err))
-	}
-
-	// 清理缓存
-	os.Remove(dest)
 
 	return okResp(map[string]any{
-		"slug":       slug,
-		"title":      pdata["title"],
-		"version":    version["version"],
-		"target_dir": targetDir,
+		"slug":         slug,
+		"title":        pdata["title"],
+		"version":      v.Version,
+		"path":         dest,
 		"content_type": contentType,
-		"installed":  true,
+		"installed":    true,
 	})
 }
 
 // ===== 辅助函数 =====
 
+// getPrimaryFileURL 返回该版本主文件的真实下载地址
 func getPrimaryFileURL(v ModrinthVersion) string {
-	if v.File != nil && len(v.File.Files) > 0 {
-		return v.File.Files[0].Hash // 实际需要构建完整 URL
+	for _, f := range v.Files {
+		if f.Primary && f.URL != "" {
+			return f.URL
+		}
 	}
-	if v.DownloadURL != "" {
-		return v.DownloadURL
+	for _, f := range v.Files {
+		if f.URL != "" {
+			return f.URL
+		}
+	}
+	return ""
+}
+
+// getPrimaryFileName 返回主文件名（用于落盘命名）
+func getPrimaryFileName(v ModrinthVersion) string {
+	for _, f := range v.Files {
+		if f.Primary && f.Filename != "" {
+			return f.Filename
+		}
+	}
+	if len(v.Files) > 0 {
+		return v.Files[0].Filename
 	}
 	return ""
 }

@@ -35,6 +35,8 @@ func printUsage() {
   auth authlib <server> <user> <pass>
                               Authlib 登录
   accounts                    列出账号
+  accounts use <type>         切换当前账号
+  accounts rm <type>          删除账号
 
   java list                   列出已安装 Java
   java install [major]        安装 Java (默认 17)
@@ -116,13 +118,16 @@ func main() {
 	initLogger()
 	cfg = loadSettings()
 	accounts = loadAccounts()
+	if cfg.Lang != "" && *lng == "" {
+		curLang = cfg.Lang
+	}
 
 	// 创建目录
 	for _, d := range []string{
 		"versions", "libraries",
 		"assets/indexes", "assets/objects",
 		"java", "logs", "sessions", "mods",
-		"mods/modrinth", "mods curseforge",
+		"mods/modrinth", "mods/curseforge",
 		"saves", "shaderpacks", "resourcepacks", "data_packs",
 	} {
 		ensureDir(baseDir + "/" + d)
@@ -253,6 +258,41 @@ func main() {
 		}
 
 	case "accounts", "account":
+		if len(args) > 0 {
+			switch args[0] {
+			case "use", "select", "switch":
+				if len(args) < 2 {
+					fmt.Fprintf(os.Stderr, "用法: mc-launcher accounts use <type>\n")
+					os.Exit(1)
+				}
+				found := false
+				for _, a := range accounts.Accounts {
+					if a.Type == args[1] {
+						found = true
+						break
+					}
+				}
+				if !found {
+					fmt.Fprintf(os.Stderr, "没有类型为 %s 的账号\n", args[1])
+					os.Exit(1)
+				}
+				accounts.Selected = args[1]
+				saveAccounts()
+				fmt.Printf("已切换账号: %s\n", args[1])
+				return
+			case "rm", "remove", "delete":
+				if len(args) < 2 {
+					fmt.Fprintf(os.Stderr, "用法: mc-launcher accounts rm <type>\n")
+					os.Exit(1)
+				}
+				if !accounts.remove(args[1]) {
+					fmt.Fprintf(os.Stderr, "没有类型为 %s 的账号\n", args[1])
+					os.Exit(1)
+				}
+				fmt.Printf("已删除账号: %s\n", args[1])
+				return
+			}
+		}
 		if len(accounts.Accounts) == 0 {
 			fmt.Println("没有已登录的账号")
 		} else {
@@ -708,10 +748,12 @@ func main() {
 		switch args[0] {
 		case "en", "english":
 			curLang = "en"
+			cfg.Lang = "en"
 			cfg.save()
 			fmt.Println("语言已切换: English")
 		case "zh", "chinese", "zh-cn":
 			curLang = "zh"
+			cfg.Lang = "zh"
 			cfg.save()
 			fmt.Println("语言已切换: 中文")
 		default:
